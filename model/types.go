@@ -32,6 +32,14 @@ type StockDataWithPreClose struct {
 	PreClose float64
 }
 
+type Factor struct {
+	Symbol   string
+	Date     time.Time
+	Close    float64
+	PreClose float64
+	Factor   float64
+}
+
 type GbbqData struct {
 	Code        string
 	Date        time.Time

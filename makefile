@@ -10,7 +10,7 @@ BIN_NAME      := tdx2db  # 二进制名称变量化
 INSTALL_DIR   := /usr/local/bin
 LOCAL_BIN     := $(HOME)/.local/bin
 
-.PHONY: all build check-unrar download extract move_datatool clean sudo-install local-install
+.PHONY: all build check-unrar download extract move_datatool clean sudo-install user-install
 
 all: build
 
@@ -24,7 +24,7 @@ sudo-install: build
 	sudo cp $(BIN_NAME) $(INSTALL_DIR)/
 	@echo "Installed to $(INSTALL_DIR)/$(BIN_NAME)"
 
-local-install: build
+user-install: build
 	@echo "Installing to user directory"
 	mkdir -p $(LOCAL_BIN)
 	cp $(BIN_NAME) $(LOCAL_BIN)/

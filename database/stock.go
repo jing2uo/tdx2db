@@ -35,7 +35,7 @@ func ImportStockCsv(db *sql.DB, csvPath string) error {
 	return nil
 }
 
-func QueryStocks(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
+func QueryStockData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
 	query := "SELECT symbol, open, high, low, close, amount, volume, date FROM stocks WHERE symbol = ?"
 	args := []interface{}{symbol}
 
@@ -83,7 +83,7 @@ func QueryStocks(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]mo
 	return results, nil
 }
 
-func GetAllSymbols(db *sql.DB) ([]string, error) {
+func QueryAllSymbols(db *sql.DB) ([]string, error) {
 	// Get all unique symbols
 	rows, err := db.Query(`SELECT DISTINCT symbol FROM stocks`)
 	if err != nil {

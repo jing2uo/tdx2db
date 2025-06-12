@@ -38,7 +38,7 @@ func ImportGbbqCsv(db *sql.DB, csvPath string) error {
 	return nil
 }
 
-func QueryGbbq(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]model.GbbqData, error) {
+func QueryGbbqData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]model.GbbqData, error) {
 	code := symbol[2:]
 	query := "SELECT * FROM gbbq WHERE code = ? ORDER BY date"
 	args := []interface{}{code}
@@ -62,7 +62,29 @@ func QueryGbbq(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]mode
 	var results []model.GbbqData
 	for rows.Next() {
 		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Date, &gbbq.Fenhong, &gbbq.Peigu, &gbbq.Peigujia, &gbbq.Songzhuangu)
+		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigu, &gbbq.Peigujia, &gbbq.Songzhuangu)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
+		}
+		results = append(results, gbbq)
+	}
+
+	return results, nil
+}
+
+func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
+	query := "SELECT * FROM gbbq ORDER BY date"
+
+	rows, err := db.Query(query)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query gbbq: %w", err)
+	}
+	defer rows.Close()
+
+	var results []model.GbbqData
+	for rows.Next() {
+		var gbbq model.GbbqData
+		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigu, &gbbq.Peigujia, &gbbq.Songzhuangu)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
 		}
