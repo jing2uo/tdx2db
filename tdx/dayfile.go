@@ -13,6 +13,8 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
+const maxConcurrency = 16
+
 func ConvertDayfiles2Csv(dayFilePath string, validPrefixes []string, outputCSV string) (string, error) {
 	// Collect matching .day files
 	var files []string
@@ -58,7 +60,6 @@ func ConvertDayfiles2Csv(dayFilePath string, validPrefixes []string, outputCSV s
 	}
 	results := make(chan result, len(files))
 	var wg sync.WaitGroup
-	const maxConcurrency = 16
 	sem := make(chan struct{}, maxConcurrency)
 
 	// Process files concurrently
@@ -96,7 +97,6 @@ func ConvertDayfiles2Csv(dayFilePath string, validPrefixes []string, outputCSV s
 	return outputCSV, nil
 }
 
-// processDayFile processes a DAY file and returns its contents as CSV rows.
 func processDayFile(dayfile string) ([]string, error) {
 	fileInfo, err := os.Stat(dayfile)
 	if err != nil {
@@ -173,7 +173,6 @@ func processDayFile(dayfile string) ([]string, error) {
 	return rows, nil
 }
 
-// parseRecord parses a 32-byte record into a DayfileRecord struct.
 func parseRecord(data []byte) (model.DayfileRecord, error) {
 	if len(data) != 32 {
 		return model.DayfileRecord{}, fmt.Errorf("invalid record length: expected 32 bytes, got %d", len(data))
@@ -187,7 +186,6 @@ func parseRecord(data []byte) (model.DayfileRecord, error) {
 	return record, nil
 }
 
-// formatDate converts a uint32 date (YYYYMMDD) to a string in YYYY-MM-DD format.
 func formatDate(date uint32) (string, error) {
 	d := int(date)
 	year := d / 10000

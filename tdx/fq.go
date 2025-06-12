@@ -3,9 +3,51 @@ package tdx
 import (
 	"fmt"
 	"sort"
+	"strings"
+	"time"
 
 	"github.com/jing2uo/tdx2db/model"
 )
+
+func CalculateFqFactor(stockData []model.StockData, gbbqData []model.GbbqData) ([]model.Factor, error) {
+	fqData, err := CalculatePreClose(stockData, gbbqData)
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]model.Factor, len(fqData))
+	for i, data := range fqData {
+		result[i] = model.Factor{
+			Symbol:   data.Symbol,
+			Date:     data.Date,
+			Close:    data.Close,
+			PreClose: data.PreClose,
+			Factor:   1.0, // Initialize Factor (QfqFactor) to 1.0
+		}
+	}
+
+	if len(fqData) < 1 {
+		return result, nil
+	}
+
+	factors := make([]float64, len(fqData))
+	for i := 0; i < len(fqData)-1; i++ {
+		if fqData[i].Close != 0 {
+			factors[i] = fqData[i+1].PreClose / fqData[i].Close
+		} else {
+			factors[i] = 1.0 // Avoid division by zero
+		}
+	}
+	factors[len(fqData)-1] = 1.0 // Last day's factor is 1
+
+	cumprod := 1.0
+	for i := len(fqData) - 1; i >= 0; i-- {
+		cumprod *= factors[i]
+		result[i].Factor = cumprod
+	}
+
+	return result, nil
+}
 
 func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) ([]model.StockDataWithPreClose, error) {
 	if stockData == nil {
@@ -21,8 +63,53 @@ func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 		return sortedStockData[i].Date.Before(sortedStockData[j].Date)
 	})
 
-	sortedGbbqData := make([]model.GbbqData, len(gbbqData))
-	copy(sortedGbbqData, gbbqData)
+	// 获取股票代码名称
+	var stockName string
+	if len(sortedStockData) > 0 {
+		stockName = sortedStockData[0].Symbol
+	} else {
+		return []model.StockDataWithPreClose{}, nil
+	}
+
+	// 处理北交所股票，把 2021-11-15 开市前的数据直接删除
+	cutoffDate := time.Date(2021, 11, 15, 0, 0, 0, 0, time.UTC)
+	if strings.HasPrefix(stockName, "bj") {
+		// 过滤sortedStockData
+		filteredStock := []model.StockData{}
+		for _, data := range sortedStockData {
+			if !data.Date.Before(cutoffDate) {
+				filteredStock = append(filteredStock, data)
+			}
+		}
+		sortedStockData = filteredStock
+
+		// 过滤gbbqData
+		filteredGbbq := []model.GbbqData{}
+		for _, g := range gbbqData {
+			if !g.Date.Before(cutoffDate) {
+				filteredGbbq = append(filteredGbbq, g)
+			}
+		}
+		gbbqData = filteredGbbq
+	}
+
+	// 获取最早的股票数据日期
+	var earliestStockDate time.Time
+	if len(sortedStockData) > 0 {
+		earliestStockDate = sortedStockData[0].Date
+	}
+
+	// 过滤GBBQ数据，仅保留不早于earliestStockDate的日期
+	filteredGbbqData := []model.GbbqData{}
+	for _, g := range gbbqData {
+		if !g.Date.Before(earliestStockDate) {
+			filteredGbbqData = append(filteredGbbqData, g)
+		}
+	}
+
+	// 排序过滤后的GBBQ数据
+	sortedGbbqData := make([]model.GbbqData, len(filteredGbbqData))
+	copy(sortedGbbqData, filteredGbbqData)
 	sort.Slice(sortedGbbqData, func(i, j int) bool {
 		return sortedGbbqData[i].Date.Before(sortedGbbqData[j].Date)
 	})
@@ -59,7 +146,7 @@ func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 				}
 				adjustedPreClose = ((adjustedPreClose*10 - g.Fenhong) + (g.Peigu * g.Peigujia)) / denominator
 				if adjustedPreClose < 0 {
-					return nil, fmt.Errorf("negative adjusted pre-close price %f for date %v", adjustedPreClose, currentDate)
+					fmt.Printf("Warning: %s pre-close price %f for date %v\n", stockName, adjustedPreClose, currentDate.Format("2006-01-02"))
 				}
 			}
 		}
