@@ -18,6 +18,9 @@ build: check-unrar download extract move_datatool clean-tmp
 	@echo "Building Go binary..."
 	go build -o $(BIN_NAME)
 
+prepare: check-unrar download extract move_datatool
+	@echo "Prepare datatool..."
+
 sudo-install: build
 	@echo "Installing system-wide (requires sudo)"
 	sudo mkdir -p $(INSTALL_DIR)
