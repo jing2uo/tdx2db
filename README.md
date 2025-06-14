@@ -10,18 +10,22 @@
 
 - **快速运行**：Go 并发处理，全量导入仅需 10s（Ultra 5 228V + 32G 供参考）
 - **增量更新**：支持每天或隔几天增量更新数据
-- **使用通达信券商数据**：收盘后更新数据，不用频繁发起 api 请求
-- **单文件无依赖**：通达信数据处理工具 datatool 使用 embed 打包
+- **使用通达信券商数据**：收盘后更新，不用频繁发起 api 请求，稳定可靠
+- **单文件无依赖**：打包通达信数据处理工具 datatool 在程序内部执行
 
 ## 安装说明
 
-```bash
-git clone https://github.com/jing2uo/tdx2db.git
-cd tdx2db
-make build
-make user-install # 编译并安装到 ~/.loca/bin
-make sudo-install # 编译并安装到 /usr/local/bin ，需要 sudo
-```
+1. 从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
+
+   ```bash
+   sudo mv tdx2db /usr/local/bin/
+   ```
+
+2. 验证安装：
+
+   ```bash
+   tdx2db -h
+   ```
 
 ## 使用方法
 
@@ -61,7 +65,7 @@ tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
 **必填参数**：
 
 - `--dayfiledir`：通达信 .day 文件所在目录路径（如`/TDX/vipdoc/`）
-- `--dbpath`：DuckDB 数据库文件路径（不存在时将自动创建）可以使用任意喜欢的名字, 也可以随意移动
+- `--dbpath`：DuckDB 数据库文件路径（不存在时将创建）可以使用任意路径和名字
 
 ### 增量更新数据
 
@@ -104,7 +108,6 @@ tdx2db factor --dbpath /数据库路径/数据库名.db
 
 **注意事项**：
 
-- 北交所部分股票来自新三板，以前就有数据，统一从 2021-11-15 (开市日)开始计算，之前的数据**不参与**复权。
 - 调用 factor 子命令时总是重新计算，清空 factor 表后导入。
 
 ### 查询复权价格
@@ -161,7 +164,7 @@ SELECT
     data["hfq_adj"] = (
         (data["close"] / data["pre_close"].shift(-1)).cumprod().shift(1).fillna(1)
     )
-    
+
     # 计算前复权价格
     if qfq:
         for col in ["open", "high", "low", "close", "pre_close"]:
@@ -169,8 +172,6 @@ SELECT
             data[col] = round(data[col], 2)
         data.drop(["qfq_adj", "hfq_adj"], axis=1, inplace=True)
 ```
-
-
 
 ## 自动运行
 
@@ -195,14 +196,14 @@ crontab -e
 **注意事项**：
 
 - 通达信每日数据不是收盘后立即更新，下午 5 点后是合适的时间
-- user-install 时必须使用 tdx2db 的 `绝对路径` 确保 cron 正确执行
 - 确保日志文件有写入权限
 
 ## TODO
 
 - [x] 前收盘价和复权因子计算
+- [x] 使用 github release 发布二进制
+- [ ] 增加新的命令用于 cron
 - [ ] 导入到 clickhouse、questdb 等数据库
-- [ ] 使用 github release 发布二进制
 - [ ] Windows 支持
 
 ---
