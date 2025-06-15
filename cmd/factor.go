@@ -20,7 +20,6 @@ type GbbqIndex map[string][]model.GbbqData
 
 func Factor(dbPath string) error {
 	start := time.Now()
-	defer os.RemoveAll(DataDir)
 
 	if dbPath == "" {
 		return fmt.Errorf("database path cannot be empty")

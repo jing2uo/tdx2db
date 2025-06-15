@@ -3,7 +3,6 @@ package tdx
 import (
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/jing2uo/tdx2db/model"
@@ -63,43 +62,13 @@ func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 		return sortedStockData[i].Date.Before(sortedStockData[j].Date)
 	})
 
-	// 获取股票代码名称
-	var stockName string
-	if len(sortedStockData) > 0 {
-		stockName = sortedStockData[0].Symbol
-	} else {
-		return []model.StockDataWithPreClose{}, nil
-	}
-
-	// 处理北交所股票，把 2021-11-15 开市前的数据直接删除
-	cutoffDate := time.Date(2021, 11, 15, 0, 0, 0, 0, time.UTC)
-	if strings.HasPrefix(stockName, "bj") {
-		// 过滤sortedStockData
-		filteredStock := []model.StockData{}
-		for _, data := range sortedStockData {
-			if !data.Date.Before(cutoffDate) {
-				filteredStock = append(filteredStock, data)
-			}
-		}
-		sortedStockData = filteredStock
-
-		// 过滤gbbqData
-		filteredGbbq := []model.GbbqData{}
-		for _, g := range gbbqData {
-			if !g.Date.Before(cutoffDate) {
-				filteredGbbq = append(filteredGbbq, g)
-			}
-		}
-		gbbqData = filteredGbbq
-	}
-
-	// 获取最早的股票数据日期
+	// Get the earliest stock data date
 	var earliestStockDate time.Time
 	if len(sortedStockData) > 0 {
 		earliestStockDate = sortedStockData[0].Date
 	}
 
-	// 过滤GBBQ数据，仅保留不早于earliestStockDate的日期
+	// Filter GBBQ data to only include dates on or after the earliest stock date
 	filteredGbbqData := []model.GbbqData{}
 	for _, g := range gbbqData {
 		if !g.Date.Before(earliestStockDate) {
@@ -107,7 +76,7 @@ func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 		}
 	}
 
-	// 排序过滤后的GBBQ数据
+	// Sort filtered GBBQ data
 	sortedGbbqData := make([]model.GbbqData, len(filteredGbbqData))
 	copy(sortedGbbqData, filteredGbbqData)
 	sort.Slice(sortedGbbqData, func(i, j int) bool {
@@ -145,9 +114,6 @@ func CalculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 					return nil, fmt.Errorf("division by zero in GBBQ adjustment for date %v", g.Date)
 				}
 				adjustedPreClose = ((adjustedPreClose*10 - g.Fenhong) + (g.Peigu * g.Peigujia)) / denominator
-				if adjustedPreClose < 0 {
-					fmt.Printf("Warning: %s pre-close price %f for date %v\n", stockName, adjustedPreClose, currentDate.Format("2006-01-02"))
-				}
 			}
 		}
 

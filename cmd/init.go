@@ -13,7 +13,6 @@ import (
 
 func Init(dbPath, dayFileDir string) error {
 	start := time.Now()
-	defer os.RemoveAll(DataDir)
 
 	// Validate inputs
 	if dbPath == "" {
