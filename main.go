@@ -60,29 +60,53 @@ func main() {
 		},
 	}
 
-	// 定义 init 命令的标志
+	var cronCmd = &cobra.Command{
+		Use:   "cron",
+		Short: "Cron for update and calc factor.",
+		RunE: func(c *cobra.Command, args []string) error {
+			if dbPath == "" {
+				return fmt.Errorf("--dbpath is required")
+			}
+			if err := cmd.Update(dbPath); err != nil {
+				return err
+			}
+			if err := cmd.Factor(dbPath); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+
 	initCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", ".day 文件目录路径 (必填)")
 
-	// 定义 update 命令的标志
 	updateCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 
 	factorCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 
-	// 标记必须参数
+	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
+
 	initCmd.MarkFlagRequired("dbpath")
 	initCmd.MarkFlagRequired("dayfiledir")
 	updateCmd.MarkFlagRequired("dbpath")
 	factorCmd.MarkFlagRequired("dbpath")
+	cronCmd.MarkFlagRequired("dbpath")
 
-	// 添加子命令
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(updateCmd)
 	rootCmd.AddCommand(factorCmd)
+	rootCmd.AddCommand(cronCmd)
 
-	// 执行 root 命令
+	cobra.OnFinalize(func() {
+		cleanup(cmd.DataDir)
+	})
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "🛑 错误: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+func cleanup(dataDir string) {
+	os.RemoveAll(dataDir)
 }

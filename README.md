@@ -186,15 +186,13 @@ crontab -e
 2. 添加以下内容（请替换实际路径）：
 
 ```shell
-# 更新股票和股本变迁数据
-00 17 * * * tdx2db update --dbpath /数据库路径/数据库名.db >> /日志路径/tdx2db.log 2>&1
-
-# 计算前收盘价和复权因子
-01 17 * * * tdx2db factor --dbpath /数据库路径/数据库名.db >> /日志路径/tdx2db.log 2>&1
+# 更新股票和股本变迁数据，计算前收盘价和复权因子
+00 17 * * * tdx2db cron --dbpath /数据库路径/数据库名.db >> /日志路径/tdx2db.log 2>&1
 ```
 
 **注意事项**：
 
+- cron 命令顺序调用 update 和 factor
 - 通达信每日数据不是收盘后立即更新，下午 5 点后是合适的时间
 - 确保日志文件有写入权限
 
@@ -202,7 +200,7 @@ crontab -e
 
 - [x] 前收盘价和复权因子计算
 - [x] 使用 github release 发布二进制
-- [ ] 增加新的命令用于 cron
+- [x] 增加新的命令用于 cron
 - [ ] 导入到 clickhouse、questdb 等数据库
 - [ ] Windows 支持
 

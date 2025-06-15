@@ -19,7 +19,6 @@ func Update(dbPath string) error {
 		return fmt.Errorf("database path cannot be empty")
 	}
 
-	defer os.RemoveAll(DataDir)
 	start := time.Now()
 
 	dbConfig := model.DBConfig{Path: dbPath}
@@ -62,7 +61,7 @@ func Update(dbPath string) error {
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fmt.Printf("ℹ️ %s 非交易日或数据尚未更新\n", dateStr)
+			fmt.Printf("🟡 %s 非交易日或数据尚未更新\n", dateStr)
 			continue
 		}
 
