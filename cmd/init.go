@@ -49,12 +49,6 @@ func Init(dbPath, dayFileDir string) error {
 		return fmt.Errorf("failed to import stock data: %w", err)
 	}
 	fmt.Println("📊 股票数据导入成功")
-	fmt.Println("🛠️  开始下载除权除息数据")
-	// Update GBBQ data
-	if err := UpdateGbbq(db, DataDir); err != nil {
-		return fmt.Errorf("failed to update GBBQ data: %w", err)
-	}
-	fmt.Println("📈 除权除息数据更新成功")
 	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))
 	return nil
 }
