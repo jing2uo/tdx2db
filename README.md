@@ -6,6 +6,8 @@
 
 用于将通达信数据导入并更新至 DuckDB 数据库，支持股票历史数据的全量初始化和增量更新。
 
+使用 DuckDB 中数据的代码示例见: [quant-base](https://github.com/jing2uo/quant-base)
+
 ## 功能特性
 
 - **快速运行**：Go 并发处理，全量导入不到 7s（Ultra 5 228V + 32G 供参考）
