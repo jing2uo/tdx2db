@@ -16,8 +16,9 @@ var ValidPrefixes = []string{
 	"sz00",     // 深证主板
 	"sh6",      // 上证主板+科创板
 	"bj",       // 北证股票
+	"sh880",    // 通达信概念板块
+	"sh881",    // 通达信行业板块
 	"sh000001", // 上证指数
-	"sz399001", // 深证指数
 	"bj899050"} // 北证50
 var StockCSV = filepath.Join(DataDir, "stock.csv")
 

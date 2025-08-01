@@ -45,21 +45,23 @@ tdx2db init --dbpath /数据库路径/数据库名.db --dayfiledir /通达信/vi
 ✅ 处理完成，耗时 6.518574975s
 ```
 
-也可以从 [通达信券商数据](https://www.tdx.com.cn/article/alldata.html) 下载 **上证所有证券日线(TCKV4=0)** 、**深证所有证券日线(TCKV4=0)** 、**北证所有证券日线** 后使用，下载前从网页上检查下三个文件时间是否是同一天：
+也可以从 [通达信券商数据](https://www.tdx.com.cn/article/alldata.html) 下载 **上证所有证券日线(TCKV4=0)** 、**深证所有证券日线(TCKV4=0)** 、**北证所有证券日线** 、**通达信板块指数日线** 后使用，下载前在网页上确认几个文件更新日期是否是同一天：
 
 ```bash
 wget https://www.tdx.com.cn/products/data/data/vipdoc/shlday.zip # 上证日线
 wget https://www.tdx.com.cn/products/data/data/vipdoc/szlday.zip # 深证日线
 wget https://www.tdx.com.cn/products/data/data/vipdoc/bjlday.zip # 北证日线
+wget https://www.tdx.com.cn/products/data/data/vipdoc/tdxzs_day.zip # 指数日线
 
 mkdir ~/vipdoc
 unzip -q shlday.zip -d ~/vipdoc
 unzip -q szlday.zip -d ~/vipdoc
 unzip -q bjlday.zip -d ~/vipdoc
+unzip -q tdxzs_day.zip -d ~/vipdoc
 
 tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
 
-# rm -r shlday.zip szlday.zip bjlday.zip ~/vipdoc  # 初始化后可以删除
+# rm -r shlday.zip szlday.zip bjlday.zip tdxzs_day.zip ~/vipdoc  # 初始化后可以删除
 ```
 
 **必填参数**：
