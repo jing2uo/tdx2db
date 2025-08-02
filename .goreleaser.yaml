@@ -10,6 +10,7 @@ builds:
     binary: tdx2db
     goos:
       - linux
+      - windows
     goarch:
       - amd64
     ldflags:

@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/jing2uo/tdx2db/model"
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 func Connect(cfg model.DBConfig) (*sql.DB, error) {

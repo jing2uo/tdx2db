@@ -8,7 +8,7 @@ import (
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
 	"github.com/jing2uo/tdx2db/tdx"
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 func Init(dbPath, dayFileDir string) error {
