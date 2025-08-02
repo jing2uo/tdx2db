@@ -55,9 +55,6 @@ func extractDatatool(cacheDir string) (string, error) {
 
 func extractBinary(cacheDir string) (string, error) {
 	toolName := "datatool"
-	if runtime.GOOS == "windows" {
-		toolName += ".exe"
-	}
 	srcPath := filepath.Join("embed", toolName)
 	destPath := filepath.Join(cacheDir, toolName)
 
