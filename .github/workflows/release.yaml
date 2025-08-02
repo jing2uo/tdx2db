@@ -1,9 +1,12 @@
 name: Release with GoReleaser
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     tags:
-      - 'v*' # 触发条件：推送到以 v 开头的标签（如 v1.0.0）
+      - "v*" # 触发条件：推送到以 v 开头的标签（如 v1.0.0）
 
 jobs:
   release:
@@ -15,12 +18,12 @@ jobs:
           fetch-depth: 0 # 获取完整历史以生成 changelog
 
       - name: Install unrar
-        run: sudo apt-get update && sudo apt-get install -y unrar
+        run: sudo apt-get update && sudo apt-get install -y unrar gcc g++
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.21' # 替换为你使用的 Go 版本
+          go-version: "1.24" # 替换为你使用的 Go 版本
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v6
