@@ -6,7 +6,9 @@ before:
     - make prepare
 
 builds:
-  - main: ./main.go
+  - env:
+      - CGO_ENABLED=1
+    main: ./main.go
     binary: tdx2db
     goos:
       - linux
