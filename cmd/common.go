@@ -19,6 +19,7 @@ var ValidPrefixes = []string{
 	"sh880",    // 通达信概念板块
 	"sh881",    // 通达信行业板块
 	"sh000001", // 上证指数
+	"sz399001", // 深证指数
 	"bj899050"} // 北证50
 var StockCSV = filepath.Join(DataDir, "stock.csv")
 

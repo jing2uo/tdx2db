@@ -117,6 +117,5 @@ crontab -e
 
 - [ ] 前收盘价和复权因子计算
 - [ ] 导入到 clickhouse、questdb 等数据库
-- [ ] Windows 支持
 
 ---

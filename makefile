@@ -51,7 +51,6 @@ move_datatool:
 	@echo "Moving data tool to embed directory..."
 	mkdir -p $(TDX_EMBED_DIR)
 	cp $(EXTRACT_DIR)/v4/datatool $(TDX_EMBED_DIR)/
-	cp $(EXTRACT_DIR)/v4/DataTool.exe $(TDX_EMBED_DIR)/datatool.exe
 
 clean-tmp:
 	@echo "Cleaning temporary files..."
