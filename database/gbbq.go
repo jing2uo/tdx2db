@@ -62,7 +62,7 @@ func QueryGbbqData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]
 	var results []model.GbbqData
 	for rows.Next() {
 		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigu, &gbbq.Peigujia, &gbbq.Songzhuangu)
+		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
 		}
@@ -73,7 +73,7 @@ func QueryGbbqData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]
 }
 
 func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
-	query := "SELECT * FROM gbbq ORDER BY date"
+	query := "SELECT * FROM gbbq ORDER BY code, date"
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -84,7 +84,7 @@ func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
 	var results []model.GbbqData
 	for rows.Next() {
 		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigu, &gbbq.Peigujia, &gbbq.Songzhuangu)
+		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
 		}
