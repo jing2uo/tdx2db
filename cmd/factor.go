@@ -44,6 +44,11 @@ func Factor(dbPath string) error {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 
+	fmt.Println("🔄 创建/更新前复权数据视图 (stocks_qfq)")
+	if err := database.CreateQfqView(db); err != nil {
+		return fmt.Errorf("failed to create qfq view: %w", err)
+	}
+
 	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))
 	return nil
 }

@@ -101,7 +101,8 @@ tdx2db factor --dbpath /数据库路径/数据库名.db
 # 示例输出
 📟 计算所有股票的前收盘价和复权因子
 🔢 导入前收盘价和复权因子
-✅ 处理完成，耗时 9.675334127s
+🔄 创建/更新前复权数据视图 (stocks_qfq)
+✅ 处理完成，耗时 15.318159793s
 ```
 
 **必填参数**：
@@ -116,39 +117,21 @@ tdx2db factor --dbpath /数据库路径/数据库名.db
 
 duckdb 提供了二进制命令行工具，也可以使用你喜欢的其他 sql 软件查询。
 
-聚合 `stocks` 和 `factor` 表查询数据：
+stocks_qfq 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
 
 ```sql
-# duckdb /数据库路径/数据库名.db
-
-SELECT s.*, f.pre_close, f.factor
-  FROM stocks s
-  INNER JOIN factor f
-  ON s.symbol = f.symbol AND s.date = f.date
-  WHERE s.symbol = 'sh603893' ORDER BY s.date;
-
+select * from stocks_qfq where symbol='sz000001'; # 平安银行
 ```
 
-查询前复权价格：
+factor 表中保存了计算好的前收盘价和前复权因子，可以根据前收盘价自行拓展其他复权算法：
 
 ```sql
-SELECT
-      s.symbol,
-      s.date,
-      s.volume,
-      s.amount,
-      ROUND(s.open * f.factor, 2) AS open,
-      ROUND(s.high * f.factor, 2) AS high,
-      ROUND(s.low * f.factor, 2) AS low,
-      ROUND(s.close * f.factor, 2) AS close
-  FROM stocks s
-  INNER JOIN factor f
-  ON s.symbol = f.symbol AND s.date = f.date
-  WHERE s.symbol = 'sh603893'
-  ORDER BY s.date;
+select * from factor where symbol='sz000001';
 ```
 
 **复权原理**：
+
+参考链接：https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L
 
 ```python
     # 计算复权前的前一日收盘价
