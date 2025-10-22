@@ -12,56 +12,43 @@
 
 - **快速运行**：Go 并发处理，全量导入不到 7s（Ultra 5 228V + 32G 供参考）
 - **增量更新**：支持每天或隔几天增量更新数据
+- **复权计算**：视图 stocks_qfq 存放了前复权后的行情数据，自动更新
 - **使用通达信券商数据**：收盘后更新，不用频繁发起 api 请求，稳定可靠
 - **单文件无依赖**：打包通达信数据处理工具 datatool 在程序内部执行
 
 ## 安装说明
 
-1. 从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
 
-   ```bash
-   sudo mv tdx2db /usr/local/bin/
-   ```
+```bash
+sudo mv tdx2db /usr/local/bin/
+```
 
-2. 验证安装：
+验证安装：
 
-   ```bash
-   tdx2db -h
-   ```
+```bash
+tdx2db -h
+```
 
 ## 使用方法
 
 ### 初始化数据库
 
-首次使用必须先全量导入历史数据，使用通达信软件目录时请先下载全量数据：
+首次使用必须先全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**使用：
 
-```shell
-tdx2db init --dbpath /数据库路径/数据库名.db --dayfiledir /通达信/vipdoc/
+```bash
+wget https://data.tdx.com.cn/vipdoc/hsjday.zip  # 沪深京日线数据完整包
 
+mkdir ~/vipdoc
+unzip -q hsjday.zip -d ~/vipdoc
+tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
 # 示例输出
 🛠 开始转换 dayfiles 为 CSV
 🔥 转换完成
 📊 股票数据导入成功
-✅ 处理完成，耗时 6.518574975s
-```
+✅ 处理完成，耗时 7.283595071s
 
-也可以从 [通达信券商数据](https://www.tdx.com.cn/article/alldata.html) 下载 **上证所有证券日线(TCKV4=0)** 、**深证所有证券日线(TCKV4=0)** 、**北证所有证券日线** 、**通达信板块指数日线** 后使用，下载前在网页上确认几个文件更新日期是否是同一天：
-
-```bash
-wget https://www.tdx.com.cn/products/data/data/vipdoc/shlday.zip # 上证日线
-wget https://www.tdx.com.cn/products/data/data/vipdoc/szlday.zip # 深证日线
-wget https://www.tdx.com.cn/products/data/data/vipdoc/bjlday.zip # 北证日线
-wget https://www.tdx.com.cn/products/data/data/vipdoc/tdxzs_day.zip # 指数日线
-
-mkdir ~/vipdoc
-unzip -q shlday.zip -d ~/vipdoc
-unzip -q szlday.zip -d ~/vipdoc
-unzip -q bjlday.zip -d ~/vipdoc
-unzip -q tdxzs_day.zip -d ~/vipdoc
-
-tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
-
-# rm -r shlday.zip szlday.zip bjlday.zip tdxzs_day.zip ~/vipdoc  # 初始化后可以删除
+# rm -r hsjday.zip ~/vipdoc  # 初始化后可以删除
 ```
 
 **必填参数**：
@@ -69,53 +56,33 @@ tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
 - `--dayfiledir`：通达信 .day 文件所在目录路径（如`/TDX/vipdoc/`）
 - `--dbpath`：DuckDB 数据库文件路径（不存在时将创建）可以使用任意路径和名字
 
-### 增量更新数据
+### 增量更新
 
-更新数据库至最新日期，包括股票数据、股本变迁数据 (gbbq):
+cron 命令会更新数据库至最新日期，包括股票数据、股本变迁数据 (gbbq)，并计算前收盘价和复权因子。
+
+初次使用时，请在 init 后立刻执行一次 cron，以获得复权相关数据。
 
 ```bash
-tdx2db update --dbpath /数据库路径/数据库名.db
+tdx2db cron --dbpath ~/tdx.db
 
 # 示例输出
-📅 数据库中日线数据的最新日期为 2025-06-11
+📅 数据库中日线数据的最新日期为 2025-10-22
 🛠 开始下载日线数据
-✅ 成功下载 20250612 的数据
-🔥 成功转换为 CSV
-📊 股票数据导入成功
+🌲 无需下载
 🛠 开始下载除权除息数据
 📈 除权除息数据更新成功
-✅ 处理完成，耗时 12.74528605s
-```
-
-**必填参数**：
-
-- `--dbpath`：DuckDB 数据库文件路径（需使用 init 时创建的文件）
-
-### 前收盘价和复权因子
-
-根据股本变迁数据 (gbbq) 计算所有股票除权除息后的前收盘价和前复权因子:
-
-```shell
-tdx2db factor --dbpath /数据库路径/数据库名.db
-
-# 示例输出
-📟 计算所有股票的前收盘价和复权因子
+✅ 处理完成，耗时 4.061312713s
+📟 计算所有股票的前收盘价
 🔢 导入前收盘价和复权因子
 🔄 创建/更新前复权数据视图 (stocks_qfq)
-✅ 处理完成，耗时 15.318159793s
+✅ 处理完成，耗时 11.739020832s
 ```
 
 **必填参数**：
 
 - `--dbpath`：DuckDB 数据库文件路径（需使用 init 时创建的文件）
 
-**注意事项**：
-
-- 调用 factor 子命令时总是重新计算，清空 factor 表后导入。
-
-### 查询复权价格
-
-duckdb 提供了二进制命令行工具，也可以使用你喜欢的其他 sql 软件查询。
+### 前复权价查询
 
 stocks_qfq 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
 
@@ -129,29 +96,15 @@ factor 表中保存了计算好的前收盘价和前复权因子，可以根据�
 select * from factor where symbol='sz000001';
 ```
 
-**复权原理**：
+复权原理，[点击查看参考链接](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) 。
 
-参考链接：https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L
+### 子命令简介
 
-```python
-    # 计算复权前的前一日收盘价
-    data["pre_close"] = (
-        (data["close"].shift(1) * 10 - data["fenhong"])
-        + (data["peigu"] * data["peigujia"])
-    ) / (10 + data["peigu"] + data["songzhuangu"])
-
-    # 计算前复权因子 (qfq_adj)
-    data["qfq_adj"] = (
-        (data["pre_close"].shift(-1) / data["close"]).fillna(1)[::-1].cumprod()
-    )
-
-    # 计算前复权价格
-    if qfq:
-        for col in ["open", "high", "low", "close", "pre_close"]:
-            data[col] = data[col] * data["qfq_adj"]
-            data[col] = round(data[col], 2)
-        data.drop(["qfq_adj", "hfq_adj"], axis=1, inplace=True)
-```
+- completion：生成 tab 补全需要的文件
+- init：从 tdx 数据初始化 db
+- cron: 用于每日更新，会顺序执行下方的 upadte 和 factor 命令
+- update：更新行情数据和 GBBQ (股本变迁)数据到最新交易日
+- factor：根据 GBBQ 计算前收盘价和前复权因子，并刷新 stocks_qfq 视图
 
 ## 自动运行
 
@@ -172,14 +125,27 @@ crontab -e
 
 **注意事项**：
 
-- cron 命令顺序调用 update 和 factor
 - 通达信每日数据不是收盘后立即更新，下午 5 点后是合适的时间
 - 确保日志文件有写入权限
 
-**注意事项**：
+## 备份
 
-- 通达信每日数据不是收盘后立即更新，下午 4:30 后是合适的时间
-- 确保日志文件有写入权限
+1. 可以直接复制一份 db 文件，简单快捷
+2. 可以用 duckdb 命令导出行情数据为 parquet
+
+duckdb 命令使用：
+
+```bash
+# 导出 stocks 表中所有数据到 stocks.parquet
+duckdb ~/tdx.db -s "COPY (SELECT * FROM stocks) TO 'stocks.parquet' (FORMAT PARQUET, COMPRESSION 'ZSTD')"
+
+duckdb ~/tdx.db # 此处直接回车进入 duckdb 的交互终端
+
+# 从 stocks.parquet 重新建表
+create table  stocks as select * from read_parquet('stocks.parquet');
+
+# CTRL+D 退出 duckdb
+```
 
 ## TODO
 
