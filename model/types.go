@@ -27,11 +27,6 @@ type StockData struct {
 	Date   time.Time
 }
 
-type StockDataWithPreClose struct {
-	StockData
-	PreClose float64
-}
-
 type Factor struct {
 	Symbol   string
 	Date     time.Time

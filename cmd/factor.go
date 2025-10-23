@@ -44,9 +44,20 @@ func Factor(dbPath string) error {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 
-	fmt.Println("🔄 创建/更新前复权数据视图 (stocks_qfq)")
+	fmt.Println("🔄 创建/更新前复权数据视图 (v_qfq_stocks)")
 	if err := database.CreateQfqView(db); err != nil {
 		return fmt.Errorf("failed to create qfq view: %w", err)
+	}
+
+	fmt.Println("🔄 创建/更新技术指标视图")
+	if err := database.CreateMaView(db); err != nil {
+		return fmt.Errorf("failed to create ma view: %w", err)
+	}
+	if err := database.CreateVolumeRatioView(db); err != nil {
+		return fmt.Errorf("failed to create volume ratio view: %w", err)
+	}
+	if err := database.CreateAtrView(db); err != nil {
+		return fmt.Errorf("failed to create atr view: %w", err)
 	}
 
 	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))

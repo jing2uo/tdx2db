@@ -9,7 +9,7 @@ import (
 
 // 预定义表结构
 var FactorSchema = TableSchema{
-	Name: "factor",
+	Name: "raw_adjust_factor",
 	Columns: []string{
 		"symbol VARCHAR",
 		"date DATE",

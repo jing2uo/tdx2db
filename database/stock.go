@@ -10,7 +10,7 @@ import (
 )
 
 var StocksSchema = TableSchema{
-	Name: "stocks",
+	Name: "raw_stocks_daily",
 	Columns: []string{
 		"symbol VARCHAR",
 		"open DOUBLE",
@@ -36,7 +36,8 @@ func ImportStockCsv(db *sql.DB, csvPath string) error {
 }
 
 func QueryStockData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
-	query := "SELECT symbol, open, high, low, close, amount, volume, date FROM stocks WHERE symbol = ?"
+	query := fmt.Sprintf("SELECT symbol, open, high, low, close, amount, volume, date FROM %s WHERE symbol = ?", StocksSchema.Name)
+
 	args := []interface{}{symbol}
 
 	// Add date range filters if provided
@@ -85,7 +86,8 @@ func QueryStockData(db *sql.DB, symbol string, startDate, endDate *time.Time) ([
 
 func QueryAllSymbols(db *sql.DB) ([]string, error) {
 	// Get all unique symbols
-	rows, err := db.Query(`SELECT DISTINCT symbol FROM stocks`)
+	query := fmt.Sprintf("SELECT DISTINCT symbol FROM %s", StocksSchema.Name)
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query symbols: %w", err)
 	}
@@ -107,12 +109,12 @@ func QueryAllSymbols(db *sql.DB) ([]string, error) {
 }
 
 func GetLatestDate(db *sql.DB) (time.Time, error) {
-	query := `
-		SELECT symbol, MAX(date) as latest_date
-		FROM stocks
-		WHERE symbol IN ('sh000001', 'sz399001', 'bj899050')
-		GROUP BY symbol;
-	`
+	query := fmt.Sprintf(
+		`SELECT symbol, MAX(date) as latest_date
+		FROM %s WHERE symbol
+		IN ('sh000001', 'sz399001', 'bj899050')
+		GROUP BY symbol;`,
+		StocksSchema.Name)
 	rows, err := db.Query(query)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("query execution failed: %v", err)
