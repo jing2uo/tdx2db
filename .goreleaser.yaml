@@ -39,13 +39,20 @@ changelog:
       - "^test:"
       - "^chore:"
 
-dockers:
-  - image_templates:
-      - "ghcr.io/jing2uo/tdx2db:{{ .Version }}"
-      - "ghcr.io/jing2uo/tdx2db:latest"
+dockers_v2:
+  - id: ghcr
     dockerfile: ./Containerfile
-    use: buildx
-    goos: linux
-    goarch: amd64
-    build_flag_templates:
-      - "--platform=linux/amd64"
+    platforms:
+      - linux/amd64
+    images:
+      - "ghcr.io/jing2uo/tdx2db"
+    tags:
+      - "{{ .Version }}"
+      - "latest"
+    labels:
+      "org.opencontainers.image.title": "tdx2db"
+      "org.opencontainers.image.description": "Convert and import TDX data into DuckDB"
+      "org.opencontainers.image.created": "{{ .Date }}"
+      "org.opencontainers.image.revision": "{{ .FullCommit }}"
+      "org.opencontainers.image.version": "{{ .Version }}"
+      "org.opencontainers.image.source": "{{ .GitURL }}"
