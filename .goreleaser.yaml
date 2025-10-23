@@ -38,3 +38,14 @@ changelog:
       - "^docs:"
       - "^test:"
       - "^chore:"
+
+dockers:
+  - image_templates:
+      - "ghcr.io/jing2uo/tdx2db:{{ .Version }}"
+      - "ghcr.io/jing2uo/tdx2db:latest"
+    dockerfile: ./Containerfile
+    use: buildx
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--platform=linux/amd64"
