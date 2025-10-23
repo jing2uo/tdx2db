@@ -5,10 +5,10 @@ import (
 	"os"
 	"time"
 
+	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
 	"github.com/jing2uo/tdx2db/tdx"
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 func Init(dbPath, dayFileDir string) error {
