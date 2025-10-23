@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/model"
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 func Connect(cfg model.DBConfig) (*sql.DB, error) {

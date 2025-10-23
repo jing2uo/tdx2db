@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/model"
-	_ "github.com/marcboeker/go-duckdb"
 )
 
 var GBBQSchema = TableSchema{
