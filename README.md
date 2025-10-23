@@ -18,16 +18,21 @@
 
 ## 安装说明
 
+### 使用 Docker 或 podman
+
+项目会利用 github action 构建容器镜像，windows 和 mac 可以通过 docker 或 podman 使用:
+
+```bash
+docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
+```
+
+### Linux 二进制安装
+
 从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/
-```
-
-验证安装：
-
-```bash
-tdx2db -h
+tdx2db -h # 验证安装
 ```
 
 ## 使用方法
@@ -37,11 +42,19 @@ tdx2db -h
 首次使用必须先全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**使用：
 
 ```bash
-wget https://data.tdx.com.cn/vipdoc/hsjday.zip  # 沪深京日线数据完整包
+# 以下命令在终端执行
 
-mkdir ~/vipdoc
-unzip -q hsjday.zip -d ~/vipdoc
-tdx2db init --dbpath ~/tdx.db --dayfiledir ~/vipdoc
+wget https://data.tdx.com.cn/vipdoc/hsjday.zip  # 沪深京日线数据完整包，可以使用浏览器下载
+
+mkdir vipdoc
+unzip -q hsjday.zip -d vipdoc
+
+# 二进制安装运行
+tdx2db init --dbpath tdx.db --dayfiledir vipdoc
+
+# 通过 docker 运行，运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级
+docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+
 # 示例输出
 🛠 开始转换 dayfiles 为 CSV
 🔥 转换完成
@@ -63,7 +76,11 @@ cron 命令会更新数据库至最新日期，包括股票数据、股本变迁
 初次使用时，请在 init 后立刻执行一次 cron，以获得复权相关数据。
 
 ```bash
+# 二进制安装运行
 tdx2db cron --dbpath ~/tdx.db
+
+# 通过 docker 运行
+docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
 
 # 示例输出
 📅 数据库中日线数据的最新日期为 2025-10-22
@@ -80,7 +97,7 @@ tdx2db cron --dbpath ~/tdx.db
 
 **必填参数**：
 
-- `--dbpath`：DuckDB 数据库文件路径（需使用 init 时创建的文件）
+- `--dbpath`：DuckDB 数据库文件路径（使用 init 时创建的文件，db 文件可以移动，通过路径能找到即可）
 
 ### 前复权价查询
 
@@ -151,5 +168,9 @@ create table  stocks as select * from read_parquet('stocks.parquet');
 
 - [x] 前收盘价和复权因子计算
 - [ ] 导入到 clickhouse、questdb 等数据库
+
+## 欢迎 issue 和 pr
+
+有任何使用问题都可以开 issue 讨论，也期待 pr，如果项目有帮到你可以点个 star ~
 
 ---
