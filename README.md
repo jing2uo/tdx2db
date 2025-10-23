@@ -10,7 +10,7 @@
 
 ## 功能特性
 
-- **快速运行**：Go 并发处理，全量导入不到 7s（Ultra 5 228V + 32G 供参考）
+- **快速运行**：Go 并发处理，全量导入不到 8s（Ultra 5 228V + 32G 供参考）
 - **增量更新**：支持每天或隔几天增量更新数据
 - **复权计算**：视图 stocks_qfq 存放了前复权后的行情数据，自动更新
 - **使用通达信券商数据**：收盘后更新，不用频繁发起 api 请求，稳定可靠
@@ -61,13 +61,13 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 📊 股票数据导入成功
 ✅ 处理完成，耗时 7.283595071s
 
-# rm -r hsjday.zip ~/vipdoc  # 初始化后可以删除
+# rm -r hsjday.zip vipdoc  # 初始化后可以删除
 ```
 
 **必填参数**：
 
-- `--dayfiledir`：通达信 .day 文件所在目录路径（如`/TDX/vipdoc/`）
-- `--dbpath`：DuckDB 数据库文件路径（不存在时将创建）可以使用任意路径和名字
+- `--dayfiledir`：通达信 .day 文件所在目录路径
+- `--dbpath`：DuckDB 数据库文件路径
 
 ### 增量更新
 
@@ -77,7 +77,7 @@ cron 命令会更新数据库至最新日期，包括股票数据、股本变迁
 
 ```bash
 # 二进制安装运行
-tdx2db cron --dbpath ~/tdx.db
+tdx2db cron --dbpath tdx.db
 
 # 通过 docker 运行
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
@@ -91,7 +91,8 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 ✅ 处理完成，耗时 4.061312713s
 📟 计算所有股票的前收盘价
 🔢 导入前收盘价和复权因子
-🔄 创建/更新前复权数据视图 (stocks_qfq)
+🔄 创建/更新前复权数据视图 (v_qfq_stocks)
+🔄 创建/更新技术指标视图
 ✅ 处理完成，耗时 11.739020832s
 ```
 
@@ -101,16 +102,16 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 
 ### 前复权价查询
 
-stocks_qfq 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
+v_qfq_stocks 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
 
 ```sql
-select * from stocks_qfq where symbol='sz000001'; # 平安银行
+select * from v_qfq_stocks where symbol='sz000001' order by date;
 ```
 
 factor 表中保存了计算好的前收盘价和前复权因子，可以根据前收盘价自行拓展其他复权算法：
 
 ```sql
-select * from factor where symbol='sz000001';
+select * from raw_adjust_factor where symbol='sz000001';
 ```
 
 复权原理，[点击查看参考链接](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) 。
@@ -122,6 +123,18 @@ select * from factor where symbol='sz000001';
 - cron: 用于每日更新，会顺序执行下方的 upadte 和 factor 命令
 - update：更新行情数据和 GBBQ (股本变迁)数据到最新交易日
 - factor：根据 GBBQ 计算前收盘价和前复权因子，并刷新 stocks_qfq 视图
+
+### 表简介
+
+raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
+
+- raw_adjust_factor: 前收盘价和前复权因子
+- raw_gbbq：股本变迁（除权除息）数据
+- raw_stocks_daily： 股票日线数据
+- v_atr： ATR 指标
+- v_ma： 10、20、60 日均线
+- v_qfq_stocks：前复权股票数据
+- v_volume_ratio：5 日量比
 
 ## 自动运行
 
@@ -154,12 +167,12 @@ duckdb 命令使用：
 
 ```bash
 # 导出 stocks 表中所有数据到 stocks.parquet
-duckdb ~/tdx.db -s "COPY (SELECT * FROM stocks) TO 'stocks.parquet' (FORMAT PARQUET, COMPRESSION 'ZSTD')"
+duckdb tdx.db -s "COPY (SELECT * FROM raw_stocks_daily) TO 'stocks.parquet' (FORMAT PARQUET, COMPRESSION 'ZSTD')"
 
-duckdb ~/tdx.db # 此处直接回车进入 duckdb 的交互终端
+duckdb tdx.db # 此处直接回车进入 duckdb 的交互终端
 
 # 从 stocks.parquet 重新建表
-create table  stocks as select * from read_parquet('stocks.parquet');
+create table stocks as select * from read_parquet('stocks.parquet');
 
 # CTRL+D 退出 duckdb
 ```
