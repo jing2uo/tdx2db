@@ -10,9 +10,9 @@
 
 ## 功能特性
 
-- **快速运行**：Go 并发处理，全量导入不到 8s（Ultra 5 228V + 32G 供参考）
+- **快速运行**：Go 并发处理，全量导入不到 6s（Ultra 5 228V + 32G 供参考）
 - **增量更新**：支持每天或隔几天增量更新数据
-- **复权计算**：视图 stocks_qfq 存放了前复权后的行情数据，自动更新
+- **复权计算**：视图 v_qfq_stocks 存放了前复权行情数据，自动更新
 - **使用通达信券商数据**：收盘后更新，不用频繁发起 api 请求，稳定可靠
 - **单文件无依赖**：打包通达信数据处理工具 datatool 在程序内部执行
 
@@ -59,7 +59,7 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 🛠 开始转换 dayfiles 为 CSV
 🔥 转换完成
 📊 股票数据导入成功
-✅ 处理完成，耗时 7.283595071s
+✅ 处理完成，耗时 5.007506252s
 
 # rm -r hsjday.zip vipdoc  # 初始化后可以删除
 ```
@@ -83,17 +83,19 @@ tdx2db cron --dbpath tdx.db
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
 
 # 示例输出
-📅 数据库中日线数据的最新日期为 2025-10-22
+📅 日线数据的最新日期为 2025-10-23
 🛠 开始下载日线数据
-🌲 无需下载
+✅ 已下载 20251024 的数据
+🟡 20251025 非交易日或数据尚未更新
+🛠 开始转换 dayfiles 为 CSV
+🔥 转换完成
+📊 股票数据导入成功
 🛠 开始下载除权除息数据
 📈 除权除息数据更新成功
-✅ 处理完成，耗时 4.061312713s
-📟 计算所有股票的前收盘价
-🔢 导入前收盘价和复权因子
+📟 计算所有股票前收盘价
+🔢 复权因子导入成功
 🔄 创建/更新前复权数据视图 (v_qfq_stocks)
-🔄 创建/更新技术指标视图
-✅ 处理完成，耗时 11.739020832s
+✅ 处理完成，耗时 22.805808029s
 ```
 
 **必填参数**：
@@ -102,27 +104,19 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 
 ### 前复权价查询
 
-v_qfq_stocks 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
+**v_qfq_stocks** 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
 
 ```sql
 select * from v_qfq_stocks where symbol='sz000001' order by date;
 ```
 
-factor 表中保存了计算好的前收盘价和前复权因子，可以根据前收盘价自行拓展其他复权算法：
+**raw_adjust_factor** 表中保存了前收盘价和前复权因子，可以根据前收盘价拓展其他复权算法：
 
 ```sql
 select * from raw_adjust_factor where symbol='sz000001';
 ```
 
-复权原理，[点击查看参考链接](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) 。
-
-### 子命令简介
-
-- completion：生成 tab 补全需要的文件
-- init：从 tdx 数据初始化 db
-- cron: 用于每日更新，会顺序执行下方的 upadte 和 factor 命令
-- update：更新行情数据和 GBBQ (股本变迁)数据到最新交易日
-- factor：根据 GBBQ 计算前收盘价和前复权因子，并刷新 stocks_qfq 视图
+复权原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) , 算法来自 QUANTAXIS，复权结果和雪球、新浪两家结果一致，和同花顺及常见券商的结果不一致。
 
 ### 表简介
 
@@ -131,10 +125,9 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 - raw_adjust_factor: 前收盘价和前复权因子
 - raw_gbbq：股本变迁（除权除息）数据
 - raw_stocks_daily： 股票日线数据
-- v_atr： ATR 指标
-- v_ma： 10、20、60 日均线
 - v_qfq_stocks：前复权股票数据
-- v_volume_ratio：5 日量比
+
+项目下 sql 目录中保存了一些 sql，可用于创建基本的技术指标视图。
 
 ## 自动运行
 
@@ -172,18 +165,17 @@ duckdb tdx.db -s "COPY (SELECT * FROM raw_stocks_daily) TO 'stocks.parquet' (FOR
 duckdb tdx.db # 此处直接回车进入 duckdb 的交互终端
 
 # 从 stocks.parquet 重新建表
-create table stocks as select * from read_parquet('stocks.parquet');
+create table raw_stocks_daily as select * from read_parquet('stocks.parquet');
 
 # CTRL+D 退出 duckdb
 ```
 
 ## TODO
 
-- [x] 前收盘价和复权因子计算
 - [ ] 导入到 clickhouse、questdb 等数据库
 
 ## 欢迎 issue 和 pr
 
-有任何使用问题都可以开 issue 讨论，也期待 pr，如果项目有帮到你可以点个 star ~
+有任何使用问题都可以开 issue 讨论，也期待 pr~
 
 ---
