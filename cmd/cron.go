@@ -265,6 +265,7 @@ func UpdateFactors(db *sql.DB) error {
 
 	return nil
 }
+
 func buildGbbqIndex(db *sql.DB) (GbbqIndex, error) {
 	index := make(GbbqIndex)
 

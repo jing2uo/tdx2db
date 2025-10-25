@@ -10,8 +10,9 @@ var DataDir, _ = utils.GetCacheDir()
 var ValidPrefixes = []string{
 	"sz30",     // 创业板
 	"sz00",     // 深证主板
-	"sh6",      // 上证主板+科创板
-	"bj",       // 北证股票
+	"sh60",     // 上证主板
+	"sh68",     // 科创板
+	"bj920",    // 北证
 	"sh000300", // 沪深300
 	"sh000905", // 中证500
 	"sh000852", // 中证1000
