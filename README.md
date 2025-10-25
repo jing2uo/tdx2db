@@ -26,9 +26,9 @@
 docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 ```
 
-### Linux 二进制安装
+### 二进制安装
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`，二进制仅支持在 Linux 中直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/
@@ -42,18 +42,18 @@ tdx2db -h # 验证安装
 首次使用必须先全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**使用：
 
 ```bash
-# 以下命令在终端执行
-
-wget https://data.tdx.com.cn/vipdoc/hsjday.zip  # 沪深京日线数据完整包，可以使用浏览器下载
-
+# Linux 和 mac 在终端执行以下命令
 mkdir vipdoc
-unzip -q hsjday.zip -d vipdoc
-
-# 二进制安装运行
+wget https://data.tdx.com.cn/vipdoc/hsjday.zip && unzip -q hsjday.zip -d vipdoc
+# Linux 二进制安装运行
 tdx2db init --dbpath tdx.db --dayfiledir vipdoc
-
-# 通过 docker 运行，运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级
+# docker 运行，运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+
+# windows 在 powershell 执行以下命令
+Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsjday.zip"
+Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
+docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
 
 # 示例输出
 🛠 开始转换 dayfiles 为 CSV
@@ -61,7 +61,7 @@ docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:
 📊 股票数据导入成功
 ✅ 处理完成，耗时 5.007506252s
 
-# rm -r hsjday.zip vipdoc  # 初始化后可以删除
+# hsjday.zip vipdoc 初始化后可以删除
 ```
 
 **必填参数**：
@@ -81,6 +81,10 @@ tdx2db cron --dbpath tdx.db
 
 # 通过 docker 运行
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+
+# windows docker 运行时命令有细微区别
+docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+
 
 # 示例输出
 📅 日线数据的最新日期为 2025-10-23
@@ -127,7 +131,7 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 - raw_stocks_daily： 股票日线数据
 - v_qfq_stocks：前复权股票数据
 
-项目下 sql 目录中保存了一些 sql，可用于创建基本的技术指标视图。
+项目下 sql 目录中保存了可用于创建基本的技术指标视图的代码。
 
 ## 自动运行
 
