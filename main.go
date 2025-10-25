@@ -32,34 +32,6 @@ func main() {
 		},
 	}
 
-	var updateCmd = &cobra.Command{
-		Use:   "update",
-		Short: "Update data in DuckDB.",
-		RunE: func(c *cobra.Command, args []string) error {
-			if dbPath == "" {
-				return fmt.Errorf("--dbpath is required")
-			}
-			if err := cmd.Update(dbPath); err != nil {
-				return err
-			}
-			return nil
-		},
-	}
-
-	var factorCmd = &cobra.Command{
-		Use:   "factor",
-		Short: "Calculate fq factor.",
-		RunE: func(c *cobra.Command, args []string) error {
-			if dbPath == "" {
-				return fmt.Errorf("--dbpath is required")
-			}
-			if err := cmd.Factor(dbPath); err != nil {
-				return err
-			}
-			return nil
-		},
-	}
-
 	var cronCmd = &cobra.Command{
 		Use:   "cron",
 		Short: "Cron for update and calc factor.",
@@ -67,10 +39,7 @@ func main() {
 			if dbPath == "" {
 				return fmt.Errorf("--dbpath is required")
 			}
-			if err := cmd.Update(dbPath); err != nil {
-				return err
-			}
-			if err := cmd.Factor(dbPath); err != nil {
+			if err := cmd.Cron(dbPath); err != nil {
 				return err
 			}
 			return nil
@@ -80,21 +49,13 @@ func main() {
 	initCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", ".day 文件目录路径 (必填)")
 
-	updateCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
-
-	factorCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
-
 	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 
 	initCmd.MarkFlagRequired("dbpath")
 	initCmd.MarkFlagRequired("dayfiledir")
-	updateCmd.MarkFlagRequired("dbpath")
-	factorCmd.MarkFlagRequired("dbpath")
 	cronCmd.MarkFlagRequired("dbpath")
 
 	rootCmd.AddCommand(initCmd)
-	rootCmd.AddCommand(updateCmd)
-	rootCmd.AddCommand(factorCmd)
 	rootCmd.AddCommand(cronCmd)
 
 	cobra.OnFinalize(func() {
