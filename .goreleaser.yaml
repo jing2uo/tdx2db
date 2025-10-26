@@ -42,6 +42,8 @@ changelog:
 dockers_v2:
   - id: ghcr
     dockerfile: ./Containerfile
+    extra_files:
+      - export_for_qlib
     platforms:
       - linux/amd64
     images:
