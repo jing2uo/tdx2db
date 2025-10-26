@@ -26,9 +26,9 @@
 docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 ```
 
-### Linux 二进制安装
+### 二进制安装
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`，二进制仅支持在 Linux 中直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/
@@ -37,32 +37,44 @@ tdx2db -h # 验证安装
 
 ## 使用方法
 
-### 初始化数据库
+### 初始化
 
-首次使用必须先全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**使用：
+首次使用必须先全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**使用。
 
-```bash
-# 以下命令在终端执行
+Linux 或 mac ：
 
-wget https://data.tdx.com.cn/vipdoc/hsjday.zip  # 沪深京日线数据完整包，可以使用浏览器下载
-
+```shell
 mkdir vipdoc
-unzip -q hsjday.zip -d vipdoc
+wget https://data.tdx.com.cn/vipdoc/hsjday.zip && unzip -q hsjday.zip -d vipdoc
 
-# 二进制安装运行
-tdx2db init --dbpath tdx.db --dayfiledir vipdoc
-
-# 通过 docker 运行，运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级
+# docker
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
 
-# 示例输出
+# Linux 二进制
+tdx2db init --dbpath tdx.db --dayfiledir vipdoc
+```
+
+Windows powershell ：
+
+```shell
+# 下载文件
+Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsjday.zip"
+# 解压文件
+Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
+# 执行 init
+docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+```
+
+示例输出:
+
+```shell
 🛠 开始转换 dayfiles 为 CSV
 🔥 转换完成
 📊 股票数据导入成功
 ✅ 处理完成，耗时 5.007506252s
-
-# rm -r hsjday.zip vipdoc  # 初始化后可以删除
 ```
+
+运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级， hsjday.zip 和 vipdoc 初始化后可删除。
 
 **必填参数**：
 
@@ -81,6 +93,10 @@ tdx2db cron --dbpath tdx.db
 
 # 通过 docker 运行
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+
+# windows docker 运行
+docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+
 
 # 示例输出
 📅 日线数据的最新日期为 2025-10-23
@@ -118,6 +134,29 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 复权原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) , 算法来自 QUANTAXIS，复权结果和雪球、新浪两家结果一致，和同花顺及常见券商的结果不一致。
 
+### 导出 Qlib 需要的 csv
+
+Qlib 需要 "sh000001.csv" 命名的日线文件，前复权历史因子会变化需要单独导出因子文件，提供了一个脚本 export_for_qlib 以导出满足它要求的 csv 。
+
+--fromdate 是可选参数，会导出日期后（不包含当天）的股票日线，不填时全量导出，factor 始终全量导出。
+
+```shell
+docker run --rm --platform=linux/amd64 --entrypoint "" -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest /export_for_qlib  --db-path /data/tdx.db --output /data/aabb --fromdate 2024-01-01
+
+# 示例输出
+数据过滤启用: date > 2024-01-01
+导出 DuckDB 数据中...
+拆分: /data/aabb/factor.csv → /data/aabb/factor
+拆分: /data/aabb/data.csv → /data/aabb/data
+清理中间文件：/data/aabb/factor.csv, /data/aabb/data.csv
+完成 ✅ 输出目录: /data/aabb
+
+# Linux 可以直接下载项目根目录下的 export_for_qlib 使用，依赖 duckdb 和 awk
+./export_for_qlib --db-path tdx.db --output aabb --fromdate 2024-01-01
+```
+
+运行结束后当前目录会有 aabb 文件夹，里面有 data (股票日线 csv) 和 factor(全量复权因子 csv)
+
 ### 表简介
 
 raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
@@ -127,29 +166,7 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 - raw_stocks_daily： 股票日线数据
 - v_qfq_stocks：前复权股票数据
 
-项目下 sql 目录中保存了一些 sql，可用于创建基本的技术指标视图。
-
-## 自动运行
-
-Linux 下通过 cron 实现每日 17:00 自动更新：
-
-1. 编辑定时任务：
-
-```bash
-crontab -e
-```
-
-2. 添加以下内容（请替换实际路径）：
-
-```shell
-# 更新股票和股本变迁数据，计算前收盘价和复权因子
-00 17 * * * tdx2db cron --dbpath /数据库路径/数据库名.db >> /日志路径/tdx2db.log 2>&1
-```
-
-**注意事项**：
-
-- 通达信每日数据不是收盘后立即更新，下午 5 点后是合适的时间
-- 确保日志文件有写入权限
+项目下 sql 目录中保存了可用于创建基本的技术指标视图的代码。
 
 ## 备份
 
@@ -159,15 +176,11 @@ crontab -e
 duckdb 命令使用：
 
 ```bash
-# 导出 stocks 表中所有数据到 stocks.parquet
+# 导出 stocks 表到 stocks.parquet
 duckdb tdx.db -s "COPY (SELECT * FROM raw_stocks_daily) TO 'stocks.parquet' (FORMAT PARQUET, COMPRESSION 'ZSTD')"
 
-duckdb tdx.db # 此处直接回车进入 duckdb 的交互终端
-
 # 从 stocks.parquet 重新建表
-create table raw_stocks_daily as select * from read_parquet('stocks.parquet');
-
-# CTRL+D 退出 duckdb
+duckdb new.db -s "create table raw_stocks_daily as select * from read_parquet('stocks.parquet');"
 ```
 
 ## TODO

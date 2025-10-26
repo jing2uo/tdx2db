@@ -13,14 +13,15 @@ const dbPathInfo = "DuckDB 文件路径 (必填)"
 func main() {
 	var rootCmd = &cobra.Command{
 		Use:           "tdx2db",
-		Short:         "Load TDX Data to DuckDB.",
+		Short:         "Load TDX Data to DuckDB",
 		SilenceErrors: true,
 	}
 
 	var dbPath, dayFileDir string
+
 	var initCmd = &cobra.Command{
 		Use:   "init",
-		Short: "Fully initialize stocks and gbbq data.",
+		Short: "Fully initialize stocks and gbbq data",
 		RunE: func(c *cobra.Command, args []string) error {
 			if dbPath == "" || dayFileDir == "" {
 				return fmt.Errorf("both --dbpath and --dayfiledir are required")
@@ -34,7 +35,7 @@ func main() {
 
 	var cronCmd = &cobra.Command{
 		Use:   "cron",
-		Short: "Cron for update and calc factor.",
+		Short: "Cron for update data and calc factor",
 		RunE: func(c *cobra.Command, args []string) error {
 			if dbPath == "" {
 				return fmt.Errorf("--dbpath is required")
@@ -48,11 +49,10 @@ func main() {
 
 	initCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", ".day 文件目录路径 (必填)")
-
-	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
-
 	initCmd.MarkFlagRequired("dbpath")
 	initCmd.MarkFlagRequired("dayfiledir")
+
+	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 	cronCmd.MarkFlagRequired("dbpath")
 
 	rootCmd.AddCommand(initCmd)
