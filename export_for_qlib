@@ -1,0 +1,99 @@
+#!/usr/bin/env bash
+
+# 参数解析
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --db-path)
+      DB_PATH="$2"
+      shift 2
+      ;;
+    --output)
+      OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    --fromdate)
+      FROM_DATE="$2"
+      shift 2
+      ;;
+    *)
+      echo "未知参数: $1"
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$DB_PATH" || -z "$OUTPUT_DIR" ]]; then
+  echo "用法: $0 --db-path tdx.db --output out_dir [--fromdate YYYY-MM-DD]"
+  exit 1
+fi
+
+# 创建输出目录
+FACTOR_DIR="$OUTPUT_DIR/factor"
+DATA_DIR="$OUTPUT_DIR/data"
+mkdir -p "$OUTPUT_DIR" "$FACTOR_DIR" "$DATA_DIR"
+
+FACTOR_CSV="$OUTPUT_DIR/factor.csv"
+DATA_CSV="$OUTPUT_DIR/data.csv"
+
+WHERE_CLAUSE=""
+if [[ -n "$FROM_DATE" ]]; then
+  # 格式校验：YYYY-MM-DD
+  if [[ ! "$FROM_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "❌ --fromdate 必须是 YYYY-MM-DD 格式，例如 2023-01-31"
+    exit 1
+  fi
+
+  # 日期合法性校验
+  if ! date -d "$FROM_DATE" >/dev/null 2>&1; then
+    echo "❌ --fromdate 日期非法: $FROM_DATE"
+    exit 1
+  fi
+
+  WHERE_CLAUSE="WHERE date > '$FROM_DATE'"
+  echo "数据过滤启用: date > $FROM_DATE"
+fi
+
+echo "导出 DuckDB 数据中..."
+
+duckdb "$DB_PATH" -s "
+COPY (
+  SELECT * FROM raw_adjust_factor ORDER BY symbol, date
+) TO '$FACTOR_CSV' (FORMAT CSV, HEADER);
+"
+
+duckdb "$DB_PATH" -s "
+COPY (
+  SELECT * FROM raw_stocks_daily
+  $WHERE_CLAUSE
+  ORDER BY symbol, date
+) TO '$DATA_CSV' (FORMAT CSV, HEADER);
+"
+
+# 通用拆分函数：按 symbol 分文件
+split_csv() {
+  local INFILE="$1"
+  local OUTDIR="$2"
+
+  echo "拆分: $INFILE → $OUTDIR"
+
+  awk -F',' -v OUT="$OUTDIR" '
+  NR==1 {header=$0; next}
+  {
+      if($1 != last){
+          close(file)
+          file = OUT "/" $1 ".csv"
+          print header > file
+          last = $1
+      }
+      print >> file
+  }' "$INFILE"
+}
+
+# 调用两次
+split_csv "$FACTOR_CSV" "$FACTOR_DIR"
+split_csv "$DATA_CSV" "$DATA_DIR"
+
+echo "清理中间文件：$FACTOR_CSV, $DATA_CSV"
+rm -rf "$FACTOR_CSV" "$DATA_CSV"
+
+echo "完成 ✅ 输出目录: $OUTPUT_DIR"
