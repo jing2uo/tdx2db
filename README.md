@@ -1,20 +1,18 @@
-# tdx2db - 通达信数据导入到 DuckDB
+# tdx2db - 简单可靠的 A 股行情数据库
 
 ## 概述
 
-`tdx2db` 是一个命令行工具。
-
-用于将通达信数据导入并更新至 DuckDB 数据库，支持股票历史数据的全量初始化和增量更新。
+`tdx2db` 可以将通达信数据导入到 DuckDB 中。
 
 使用 DuckDB 中数据的代码示例见: [quant-base](https://github.com/jing2uo/quant-base)
 
-## 功能特性
+## 亮点
 
-- **快速运行**：Go 并发处理，全量导入不到 6s（Ultra 5 228V + 32G 供参考）
-- **增量更新**：支持每天或隔几天增量更新数据
+- **快速运行**：Go 语言实现，全量导入不到 6s，随时能重建回完整的数据
+- **增量更新**：支持增量更新数据，隔几天执行更新也不会漏
 - **复权计算**：视图 v_qfq_stocks 存放了前复权行情数据，自动更新
-- **使用通达信券商数据**：收盘后更新，不用频繁发起 api 请求，稳定可靠
-- **单文件无依赖**：打包通达信数据处理工具 datatool 在程序内部执行
+- **使用通达信券商数据**：稳定可靠，不用买积分或被限流
+- **单文件无依赖**：程序和数据库都只有一个文件，足够简单
 
 ## 安装说明
 
@@ -48,10 +46,13 @@ mkdir vipdoc
 wget https://data.tdx.com.cn/vipdoc/hsjday.zip && unzip -q hsjday.zip -d vipdoc
 
 # docker
-docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+docker run --rm --platform=linux/amd64 \
+  -v "$(pwd)":/data \
+  ghcr.io/jing2uo/tdx2db:latest \
+  init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
 
 # Linux 二进制
-tdx2db init --dbpath tdx.db --dayfiledir vipdoc
+tdx2db init --dayfiledir vipdoc --dbpath tdx.db
 ```
 
 Windows powershell ：
@@ -62,7 +63,10 @@ Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsj
 # 解压文件
 Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
 # 执行 init
-docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+docker run --rm --platform=linux/amd64 \
+  -v "${PWD}:/data" \
+  ghcr.io/jing2uo/tdx2db:latest \
+  init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
 ```
 
 示例输出:
@@ -74,7 +78,7 @@ docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:
 ✅ 处理完成，耗时 5.007506252s
 ```
 
-运行结束后 tdx.db 会在当前工作目录，和 vipdoc 目录在同一级， hsjday.zip 和 vipdoc 初始化后可删除。
+运行结束后 tdx.db 会在当前工作目录，和 vipdoc 在同一级， hsjday.zip 和 vipdoc 初始化后可删除。
 
 **必填参数**：
 
@@ -92,10 +96,16 @@ cron 命令会更新数据库至最新日期，包括股票数据、股本变迁
 tdx2db cron --dbpath tdx.db
 
 # 通过 docker 运行
-docker run --rm --platform=linux/amd64 -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+docker run --rm --platform=linux/amd64 \
+  -v "$(pwd)":/data \
+  ghcr.io/jing2uo/tdx2db:latest \
+  cron --dbpath /data/tdx.db
 
 # windows docker 运行
-docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:latest cron --dbpath /data/tdx.db
+docker run --rm --platform=linux/amd64 \
+  -v "${PWD}:/data" \
+  ghcr.io/jing2uo/tdx2db:latest \
+  cron --dbpath /data/tdx.db
 
 
 # 示例输出
@@ -120,7 +130,7 @@ docker run --rm --platform=linux/amd64 -v "${PWD}:/data" ghcr.io/jing2uo/tdx2db:
 
 ### 前复权价查询
 
-**v_qfq_stocks** 视图保存了前复权数据，执行 factor 和 cron 子命令时视图会自动更新：
+**v_qfq_stocks** 视图保存了前复权数据，执行 cron 子命令时视图会自动更新：
 
 ```sql
 select * from v_qfq_stocks where symbol='sz000001' order by date;
@@ -134,14 +144,17 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 复权原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) , 算法来自 QUANTAXIS，复权结果和雪球、新浪两家结果一致，和同花顺及常见券商的结果不一致。
 
-### 导出 Qlib 需要的 csv
+### 导出 Qlib 需要的 CSV
 
 Qlib 需要 "sh000001.csv" 命名的日线文件，前复权历史因子会变化需要单独导出因子文件，提供了一个脚本 export_for_qlib 以导出满足它要求的 csv 。
 
 --fromdate 是可选参数，会导出日期后（不包含当天）的股票日线，不填时全量导出，factor 始终全量导出。
 
 ```shell
-docker run --rm --platform=linux/amd64 --entrypoint "" -v "$(pwd)":/data ghcr.io/jing2uo/tdx2db:latest /export_for_qlib  --db-path /data/tdx.db --output /data/aabb --fromdate 2024-01-01
+docker run --rm --platform=linux/amd64 --entrypoint "" \
+  -v "$(pwd)":/data \
+  ghcr.io/jing2uo/tdx2db:latest \
+  /export_for_qlib --db-path /data/tdx.db --output /data/aabb --fromdate 2024-01-01
 
 # 示例输出
 数据过滤启用: date > 2024-01-01
@@ -155,7 +168,9 @@ docker run --rm --platform=linux/amd64 --entrypoint "" -v "$(pwd)":/data ghcr.io
 ./export_for_qlib --db-path tdx.db --output aabb --fromdate 2024-01-01
 ```
 
-运行结束后当前目录会有 aabb 文件夹，里面有 data (股票日线 csv) 和 factor(全量复权因子 csv)
+运行结束后当前目录会有 aabb 文件夹，里面有 data (股票日线 csv) 和 factor(全量复权因子 csv)，使用 dump_bin.py 处理即可。
+
+在 [quant-base](https://github.com/jing2uo/quant-base) 中有可执行的范例。
 
 ### 表简介
 
@@ -190,5 +205,3 @@ duckdb new.db -s "create table raw_stocks_daily as select * from read_parquet('s
 ## 欢迎 issue 和 pr
 
 有任何使用问题都可以开 issue 讨论，也期待 pr~
-
----
