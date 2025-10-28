@@ -36,6 +36,7 @@ type Factor struct {
 }
 
 type GbbqData struct {
+	Category    int
 	Code        string
 	Date        time.Time
 	Fenhong     float64

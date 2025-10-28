@@ -38,12 +38,13 @@ func GetLatestGbbqCsv(cacheDir, csvPath string) (string, error) {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	if err := writer.Write([]string{"date", "code", "fenhong", "peigujia", "songzhuangu", "peigu"}); err != nil {
+	if err := writer.Write([]string{"category", "date", "code", "fenhong", "peigujia", "songzhuangu", "peigu"}); err != nil {
 		return "", fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
 	for _, stock := range data {
 		row := []string{
+			fmt.Sprintf("%d", stock.Category),
 			stock.Date.Format("2006-01-02"),
 			stock.Code,
 			fmt.Sprintf("%f", stock.Fenhong),
@@ -113,9 +114,6 @@ func processGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 		}
 
 		category := clearData[12]
-		if category != 1 {
-			continue
-		}
 
 		codeBytes := clearData[1:8]
 		code := string(bytes.TrimRight(codeBytes, "\x00"))
@@ -132,6 +130,7 @@ func processGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 		peigu := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[25:29])))
 
 		g := model.GbbqData{
+			Category:    int(category),
 			Code:        code,
 			Date:        dateTime,
 			Fenhong:     fenhong,

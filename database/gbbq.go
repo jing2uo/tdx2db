@@ -11,6 +11,7 @@ import (
 var GBBQSchema = TableSchema{
 	Name: "raw_gbbq",
 	Columns: []string{
+		"category INT",
 		"date DATE",
 		"code VARCHAR",
 		"fenhong DOUBLE",
@@ -49,7 +50,7 @@ func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
 	var results []model.GbbqData
 	for rows.Next() {
 		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
+		err := rows.Scan(&gbbq.Category, &gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
 		}

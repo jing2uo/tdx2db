@@ -116,6 +116,10 @@ func calculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 	}
 
 	for _, gbbq := range gbbqData {
+		if gbbq.Category != 1 {
+			continue
+		}
+
 		dateStr := gbbq.Date.Format(dateFormat)
 		if data, exists := dataMap[dateStr]; exists {
 			data.Fenhong = gbbq.Fenhong
