@@ -22,7 +22,7 @@ var GBBQSchema = TableSchema{
 }
 
 var XdxrViewName = "v_xdxr"
-var CapitalChangeViewName = "v_capital_change"
+var TurnoverViewName = "v_turnover"
 
 func CreateXdxrView(db *sql.DB) error {
 	query := fmt.Sprintf(`
@@ -45,23 +45,48 @@ func CreateXdxrView(db *sql.DB) error {
 	return nil
 }
 
-func CreateCapitalChangeView(db *sql.DB) error {
+func CreateTurnoverView(db *sql.DB) error {
 	query := fmt.Sprintf(`
-	CREATE OR REPLACE VIEW %s AS
-	SELECT
-		date,
-		code,
-		c1 as prev_outstanding,
-		c2 as prev_total,
-		c3 as outstanding,
-		c4 as total,
-	FROM %s
-	WHERE category in (2,3,5,7,8,9,10);
-	`, CapitalChangeViewName, GBBQSchema.Name)
+    CREATE OR REPLACE VIEW %s AS
+    WITH base_cc AS (
+        SELECT
+            date,
+            code,
+            c3 AS float_shares,
+            c4 AS total_shares
+        FROM %s
+        WHERE category IN (2, 3, 5, 7, 8, 9, 10)
+    ),
+    expanded AS (
+        SELECT
+            d.date,
+            d.symbol,
+            LAST_VALUE(base_cc.float_shares IGNORE NULLS)
+                OVER (PARTITION BY d.symbol ORDER BY d.date) AS float_shares,
+            LAST_VALUE(base_cc.total_shares IGNORE NULLS)
+                OVER (PARTITION BY d.symbol ORDER BY d.date) AS total_shares
+        FROM %s d
+        LEFT JOIN base_cc
+            ON base_cc.code = SUBSTR(d.symbol, 3)
+            AND base_cc.date = d.date
+    )
+
+    SELECT
+        r.date,
+        r.symbol,
+        ROUND(r.volume / (e.float_shares * 10000), 4) AS turnover,
+        ROUND(e.float_shares * 10000 * r.close, 4) AS circ_mv,
+        ROUND(e.total_shares * 10000 * r.close, 4) AS total_mv
+    FROM %s r
+    JOIN expanded e
+        ON r.symbol = e.symbol
+        AND r.date = e.date;
+	`, TurnoverViewName, GBBQSchema.Name, StocksSchema.Name, StocksSchema.Name)
 
 	_, err := db.Exec(query)
 	if err != nil {
-		return fmt.Errorf("failed to create or replace view %s: %w", CapitalChangeViewName, err)
+		// 提供更详细的错误信息
+		return fmt.Errorf("failed to create or replace view %s: %w", TurnoverViewName, err)
 	}
 	return nil
 }

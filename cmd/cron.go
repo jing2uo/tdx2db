@@ -169,9 +169,9 @@ func UpdateGbbq(db *sql.DB) error {
 		return fmt.Errorf("failed to create xdxr view: %w", err)
 	}
 
-	fmt.Printf("🔄 更新股本变迁数据视图 (%s)\n", database.CapitalChangeViewName)
-	if err := database.CreateCapitalChangeView(db); err != nil {
-		return fmt.Errorf("failed to create capital change view: %w", err)
+	fmt.Printf("🔄 更新市值换手数据视图 (%s)\n", database.TurnoverViewName)
+	if err := database.CreateTurnoverView(db); err != nil {
+		return fmt.Errorf("failed to create turnover view: %w", err)
 	}
 
 	fmt.Println("📈 股本变迁数据更新成功")

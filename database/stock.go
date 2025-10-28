@@ -33,13 +33,15 @@ func CreateQfqView(db *sql.DB) error {
 		s.date,
 		s.volume,
 		s.amount,
-		ROUND(s.open * f.factor, 2) AS open,
-		ROUND(s.high * f.factor, 2) AS high,
-		ROUND(s.low * f.factor, 2) AS low,
+		ROUND(s.open  * f.factor, 2) AS open,
+		ROUND(s.high  * f.factor, 2) AS high,
+		ROUND(s.low   * f.factor, 2) AS low,
 		ROUND(s.close * f.factor, 2) AS close,
+		t.turnover,
 	FROM %s s
 	JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
-	`, QfqViewName, StocksSchema.Name, FactorSchema.Name)
+	LEFT JOIN %s t ON s.symbol = t.symbol AND s.date = t.date;
+	`, QfqViewName, StocksSchema.Name, FactorSchema.Name, TurnoverViewName)
 
 	_, err := db.Exec(query)
 	if err != nil {
