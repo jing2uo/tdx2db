@@ -38,18 +38,19 @@ func GetLatestGbbqCsv(cacheDir, csvPath string) (string, error) {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	if err := writer.Write([]string{"date", "code", "fenhong", "peigujia", "songzhuangu", "peigu"}); err != nil {
+	if err := writer.Write([]string{"category", "date", "code", "fenhong", "peigujia", "songzhuangu", "peigu"}); err != nil {
 		return "", fmt.Errorf("failed to write CSV header: %w", err)
 	}
 
 	for _, stock := range data {
 		row := []string{
+			fmt.Sprintf("%d", stock.Category),
 			stock.Date.Format("2006-01-02"),
 			stock.Code,
-			fmt.Sprintf("%f", stock.Fenhong),
-			fmt.Sprintf("%f", stock.Peigujia),
-			fmt.Sprintf("%f", stock.Songzhuangu),
-			fmt.Sprintf("%f", stock.Peigu),
+			fmt.Sprintf("%f", stock.C1),
+			fmt.Sprintf("%f", stock.C2),
+			fmt.Sprintf("%f", stock.C3),
+			fmt.Sprintf("%f", stock.C4),
 		}
 		if err := writer.Write(row); err != nil {
 			return "", fmt.Errorf("failed to write CSV row for stock %s: %w", stock.Code, err)
@@ -113,9 +114,6 @@ func processGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 		}
 
 		category := clearData[12]
-		if category != 1 {
-			continue
-		}
 
 		codeBytes := clearData[1:8]
 		code := string(bytes.TrimRight(codeBytes, "\x00"))
@@ -126,18 +124,19 @@ func processGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 			return nil, fmt.Errorf("failed to parse date for record %d: %w", i, err)
 		}
 
-		fenhong := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[13:17])))
-		peigujia := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[17:21])))
-		songzhuangu := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[21:25])))
-		peigu := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[25:29])))
+		c1 := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[13:17])))
+		c2 := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[17:21])))
+		c3 := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[21:25])))
+		c4 := float64(math.Float32frombits(binary.LittleEndian.Uint32(clearData[25:29])))
 
 		g := model.GbbqData{
-			Code:        code,
-			Date:        dateTime,
-			Fenhong:     fenhong,
-			Peigujia:    peigujia,
-			Songzhuangu: songzhuangu,
-			Peigu:       peigu,
+			Category: int(category),
+			Code:     code,
+			Date:     dateTime,
+			C1:       c1,
+			C2:       c2,
+			C3:       c3,
+			C4:       c4,
 		}
 		result = append(result, g)
 	}

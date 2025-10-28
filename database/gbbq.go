@@ -11,13 +11,84 @@ import (
 var GBBQSchema = TableSchema{
 	Name: "raw_gbbq",
 	Columns: []string{
+		"category INT",
 		"date DATE",
 		"code VARCHAR",
-		"fenhong DOUBLE",
-		"peigujia DOUBLE",
-		"songzhuangu DOUBLE",
-		"peigu DOUBLE",
+		"c1 DOUBLE",
+		"c2 DOUBLE",
+		"c3 DOUBLE",
+		"c4 DOUBLE",
 	},
+}
+
+var XdxrViewName = "v_xdxr"
+var TurnoverViewName = "v_turnover"
+
+func CreateXdxrView(db *sql.DB) error {
+	query := fmt.Sprintf(`
+	CREATE OR REPLACE VIEW %s AS
+	SELECT
+		date,
+		code,
+		c1 as fenhong,
+		c2 as peigujia,
+		c3 as songzhuangu,
+		c4 as peigu,
+	FROM %s
+	WHERE category=1;
+	`, XdxrViewName, GBBQSchema.Name)
+
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create or replace view %s: %w", XdxrViewName, err)
+	}
+	return nil
+}
+
+func CreateTurnoverView(db *sql.DB) error {
+	query := fmt.Sprintf(`
+    CREATE OR REPLACE VIEW %s AS
+    WITH base_cc AS (
+        SELECT
+            date,
+            code,
+            c3 AS float_shares,
+            c4 AS total_shares
+        FROM %s
+        WHERE category IN (2, 3, 5, 7, 8, 9, 10)
+    ),
+    expanded AS (
+        SELECT
+            d.date,
+            d.symbol,
+            LAST_VALUE(base_cc.float_shares IGNORE NULLS)
+                OVER (PARTITION BY d.symbol ORDER BY d.date) AS float_shares,
+            LAST_VALUE(base_cc.total_shares IGNORE NULLS)
+                OVER (PARTITION BY d.symbol ORDER BY d.date) AS total_shares
+        FROM %s d
+        LEFT JOIN base_cc
+            ON base_cc.code = SUBSTR(d.symbol, 3)
+            AND base_cc.date = d.date
+    )
+
+    SELECT
+        r.date,
+        r.symbol,
+        ROUND(r.volume / (e.float_shares * 10000), 4) AS turnover,
+        ROUND(e.float_shares * 10000 * r.close, 4) AS circ_mv,
+        ROUND(e.total_shares * 10000 * r.close, 4) AS total_mv
+    FROM %s r
+    JOIN expanded e
+        ON r.symbol = e.symbol
+        AND r.date = e.date;
+	`, TurnoverViewName, GBBQSchema.Name, StocksSchema.Name, StocksSchema.Name)
+
+	_, err := db.Exec(query)
+	if err != nil {
+		// 提供更详细的错误信息
+		return fmt.Errorf("failed to create or replace view %s: %w", TurnoverViewName, err)
+	}
+	return nil
 }
 
 func ImportGbbqCsv(db *sql.DB, csvPath string) error {
@@ -37,23 +108,23 @@ func ImportGbbqCsv(db *sql.DB, csvPath string) error {
 	return nil
 }
 
-func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY code, date", GBBQSchema.Name)
+func QueryAllXdxr(db *sql.DB) ([]model.XdxrData, error) {
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY code, date", XdxrViewName)
 
 	rows, err := db.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query gbbq: %w", err)
+		return nil, fmt.Errorf("failed to query xdxr: %w", err)
 	}
 	defer rows.Close()
 
-	var results []model.GbbqData
+	var results []model.XdxrData
 	for rows.Next() {
-		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
+		var xdxr model.XdxrData
+		err := rows.Scan(&xdxr.Date, &xdxr.Code, &xdxr.Fenhong, &xdxr.Peigujia, &xdxr.Songzhuangu, &xdxr.Peigu)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
+			return nil, fmt.Errorf("failed to scan xdxr data: %w", err)
 		}
-		results = append(results, gbbq)
+		results = append(results, xdxr)
 	}
 
 	return results, nil

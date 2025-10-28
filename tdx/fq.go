@@ -21,9 +21,9 @@ type internalCombinedData struct {
 	Songzhuangu float64
 }
 
-func CalculateFqFactor(stockData []model.StockData, gbbqData []model.GbbqData) ([]model.Factor, error) {
+func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) ([]model.Factor, error) {
 	// 如果 gbbqData 为空，说明没有除权除息事件，采用快速路径处理。
-	if len(gbbqData) == 0 {
+	if len(xdxrData) == 0 {
 		// 确保 stockData 按日期升序排序，因为后续逻辑依赖于此顺序。
 		sort.Slice(stockData, func(i, j int) bool {
 			return stockData[i].Date.Before(stockData[j].Date)
@@ -57,7 +57,7 @@ func CalculateFqFactor(stockData []model.StockData, gbbqData []model.GbbqData) (
 	}
 
 	// 当 gbbqData 不为空时，执行完整复权计算逻辑
-	combined, err := calculatePreClose(stockData, gbbqData)
+	combined, err := calculatePreClose(stockData, xdxrData)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func CalculateFqFactor(stockData []model.StockData, gbbqData []model.GbbqData) (
 	return result, nil
 }
 
-func calculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) ([]*internalCombinedData, error) {
+func calculatePreClose(stockData []model.StockData, xdxrData []model.XdxrData) ([]*internalCombinedData, error) {
 	if len(stockData) == 0 {
 		return []*internalCombinedData{}, nil
 	}
@@ -115,17 +115,17 @@ func calculatePreClose(stockData []model.StockData, gbbqData []model.GbbqData) (
 		}
 	}
 
-	for _, gbbq := range gbbqData {
-		dateStr := gbbq.Date.Format(dateFormat)
+	for _, xdxr := range xdxrData {
+		dateStr := xdxr.Date.Format(dateFormat)
 		if data, exists := dataMap[dateStr]; exists {
-			data.Fenhong = gbbq.Fenhong
-			data.Peigu = gbbq.Peigu
-			data.Peigujia = gbbq.Peigujia
-			data.Songzhuangu = gbbq.Songzhuangu
+			data.Fenhong = xdxr.Fenhong
+			data.Peigu = xdxr.Peigu
+			data.Peigujia = xdxr.Peigujia
+			data.Songzhuangu = xdxr.Songzhuangu
 		} else {
 			dataMap[dateStr] = &internalCombinedData{
-				Date: gbbq.Date, Symbol: symbol, IsTradeDay: false,
-				Fenhong: gbbq.Fenhong, Peigu: gbbq.Peigu, Peigujia: gbbq.Peigujia, Songzhuangu: gbbq.Songzhuangu,
+				Date: xdxr.Date, Symbol: symbol, IsTradeDay: false,
+				Fenhong: xdxr.Fenhong, Peigu: xdxr.Peigu, Peigujia: xdxr.Peigujia, Songzhuangu: xdxr.Songzhuangu,
 			}
 		}
 	}
