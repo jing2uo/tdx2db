@@ -36,11 +36,29 @@ type Factor struct {
 }
 
 type GbbqData struct {
-	Category    int
+	Category int
+	Code     string
+	Date     time.Time
+	C1       float64
+	C2       float64
+	C3       float64
+	C4       float64
+}
+
+type XdxrData struct {
 	Code        string
 	Date        time.Time
 	Fenhong     float64
 	Peigujia    float64
 	Songzhuangu float64
 	Peigu       float64
+}
+
+type CapitalData struct {
+	Code            string
+	Date            time.Time
+	PrevOutstanding float64
+	PrevTotal       float64
+	Outstanding     float64
+	Total           float64
 }

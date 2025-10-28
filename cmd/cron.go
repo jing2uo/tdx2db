@@ -19,7 +19,7 @@ import (
 
 const maxConcurrency = 16
 
-type GbbqIndex map[string][]model.GbbqData
+type XdxrIndex map[string][]model.XdxrData
 
 func Cron(dbPath string) error {
 	start := time.Now()
@@ -49,7 +49,7 @@ func Cron(dbPath string) error {
 		return fmt.Errorf("计算前收盘价和复权因子失败：%w", err)
 	}
 
-	fmt.Printf("🔄 创建/更新前复权数据视图 (%s)\n", database.QfqViewName)
+	fmt.Printf("🔄 更新前复权数据视图 (%s)\n", database.QfqViewName)
 	if err := database.CreateQfqView(db); err != nil {
 		return fmt.Errorf("failed to create qfq view: %w", err)
 	}
@@ -150,7 +150,7 @@ func UpdateStocks(db *sql.DB) error {
 }
 
 func UpdateGbbq(db *sql.DB) error {
-	fmt.Println("🛠️  开始下载除权除息数据")
+	fmt.Println("🛠️  开始下载股本变迁数据")
 	if db == nil {
 		return fmt.Errorf("database connection cannot be nil")
 	}
@@ -164,7 +164,17 @@ func UpdateGbbq(db *sql.DB) error {
 		return fmt.Errorf("failed to import GBBQ CSV into database: %w", err)
 	}
 
-	fmt.Println("📈 除权除息数据更新成功")
+	fmt.Printf("🔄 更新除权除息数据视图 (%s)\n", database.XdxrViewName)
+	if err := database.CreateXdxrView(db); err != nil {
+		return fmt.Errorf("failed to create xdxr view: %w", err)
+	}
+
+	fmt.Printf("🔄 更新股本变迁数据视图 (%s)\n", database.CapitalChangeViewName)
+	if err := database.CreateCapitalChangeView(db); err != nil {
+		return fmt.Errorf("failed to create capital change view: %w", err)
+	}
+
+	fmt.Println("📈 股本变迁数据更新成功")
 	return nil
 }
 
@@ -179,7 +189,7 @@ func UpdateFactors(db *sql.DB) error {
 
 	fmt.Println("📟 计算所有股票前收盘价")
 	// 构建 GBBQ 索引
-	gbbqIndex, err := buildGbbqIndex(db)
+	xdxrIndex, err := buildXdxrIndex(db)
 
 	if err != nil {
 		return fmt.Errorf("构建 GBBQ 索引失败：%w", err)
@@ -227,9 +237,9 @@ func UpdateFactors(db *sql.DB) error {
 				results <- result{"", fmt.Errorf("获取 %s 的股票数据失败：%w", sym, err)}
 				return
 			}
-			gbbqData := getGbbqByCode(gbbqIndex, sym)
+			xdxrData := getXdxrByCode(xdxrIndex, sym)
 
-			factors, err := tdx.CalculateFqFactor(stockData, gbbqData)
+			factors, err := tdx.CalculateFqFactor(stockData, xdxrData)
 			if err != nil {
 				results <- result{"", fmt.Errorf("计算 %s 的因子失败：%w", sym, err)}
 				return
@@ -266,15 +276,15 @@ func UpdateFactors(db *sql.DB) error {
 	return nil
 }
 
-func buildGbbqIndex(db *sql.DB) (GbbqIndex, error) {
-	index := make(GbbqIndex)
+func buildXdxrIndex(db *sql.DB) (XdxrIndex, error) {
+	index := make(XdxrIndex)
 
-	gbbqData, err := database.QueryAllGbbq(db)
+	xdxrData, err := database.QueryAllXdxr(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query GBBQ data: %v", err)
+		return nil, fmt.Errorf("failed to query Xdxr data: %v", err)
 	}
 
-	for _, data := range gbbqData {
+	for _, data := range xdxrData {
 		code := data.Code
 		index[code] = append(index[code], data)
 	}
@@ -282,10 +292,10 @@ func buildGbbqIndex(db *sql.DB) (GbbqIndex, error) {
 	return index, nil
 }
 
-func getGbbqByCode(index GbbqIndex, symbol string) []model.GbbqData {
+func getXdxrByCode(index XdxrIndex, symbol string) []model.XdxrData {
 	code := symbol[2:]
 	if data, exists := index[code]; exists {
 		return data
 	}
-	return []model.GbbqData{}
+	return []model.XdxrData{}
 }

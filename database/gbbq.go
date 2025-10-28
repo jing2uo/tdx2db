@@ -14,11 +14,56 @@ var GBBQSchema = TableSchema{
 		"category INT",
 		"date DATE",
 		"code VARCHAR",
-		"fenhong DOUBLE",
-		"peigujia DOUBLE",
-		"songzhuangu DOUBLE",
-		"peigu DOUBLE",
+		"c1 DOUBLE",
+		"c2 DOUBLE",
+		"c3 DOUBLE",
+		"c4 DOUBLE",
 	},
+}
+
+var XdxrViewName = "v_xdxr"
+var CapitalChangeViewName = "v_capital_change"
+
+func CreateXdxrView(db *sql.DB) error {
+	query := fmt.Sprintf(`
+	CREATE OR REPLACE VIEW %s AS
+	SELECT
+		date,
+		code,
+		c1 as fenhong,
+		c2 as peigujia,
+		c3 as songzhuangu,
+		c4 as peigu,
+	FROM %s
+	WHERE category=1;
+	`, XdxrViewName, GBBQSchema.Name)
+
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create or replace view %s: %w", XdxrViewName, err)
+	}
+	return nil
+}
+
+func CreateCapitalChangeView(db *sql.DB) error {
+	query := fmt.Sprintf(`
+	CREATE OR REPLACE VIEW %s AS
+	SELECT
+		date,
+		code,
+		c1 as prev_outstanding,
+		c2 as prev_total,
+		c3 as outstanding,
+		c4 as total,
+	FROM %s
+	WHERE category in (2,3,5,7,8,9,10);
+	`, CapitalChangeViewName, GBBQSchema.Name)
+
+	_, err := db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create or replace view %s: %w", CapitalChangeViewName, err)
+	}
+	return nil
 }
 
 func ImportGbbqCsv(db *sql.DB, csvPath string) error {
@@ -38,23 +83,23 @@ func ImportGbbqCsv(db *sql.DB, csvPath string) error {
 	return nil
 }
 
-func QueryAllGbbq(db *sql.DB) ([]model.GbbqData, error) {
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY code, date", GBBQSchema.Name)
+func QueryAllXdxr(db *sql.DB) ([]model.XdxrData, error) {
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY code, date", XdxrViewName)
 
 	rows, err := db.Query(query)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query gbbq: %w", err)
+		return nil, fmt.Errorf("failed to query xdxr: %w", err)
 	}
 	defer rows.Close()
 
-	var results []model.GbbqData
+	var results []model.XdxrData
 	for rows.Next() {
-		var gbbq model.GbbqData
-		err := rows.Scan(&gbbq.Category, &gbbq.Date, &gbbq.Code, &gbbq.Fenhong, &gbbq.Peigujia, &gbbq.Songzhuangu, &gbbq.Peigu)
+		var xdxr model.XdxrData
+		err := rows.Scan(&xdxr.Date, &xdxr.Code, &xdxr.Fenhong, &xdxr.Peigujia, &xdxr.Songzhuangu, &xdxr.Peigu)
 		if err != nil {
-			return nil, fmt.Errorf("failed to scan gbbq data: %w", err)
+			return nil, fmt.Errorf("failed to scan xdxr data: %w", err)
 		}
-		results = append(results, gbbq)
+		results = append(results, xdxr)
 	}
 
 	return results, nil
