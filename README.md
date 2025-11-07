@@ -4,15 +4,16 @@
 
 `tdx2db` 可以将通达信数据导入到 DuckDB 中。
 
-使用 DuckDB 中数据的代码示例见: [quant-base](https://github.com/jing2uo/quant-base)
+使用 DuckDB 中数据的代码示例见: [ko_trading](https://github.com/jing2uo/ko_trading)
 
 ## 亮点
 
-- **快速运行**：Go 语言实现，全量导入不到 6s，随时能重建回完整的数据
-- **增量更新**：支持增量更新数据，隔几天执行更新也不会漏
-- **复权计算**：视图 v_qfq_stocks 存放了前复权行情数据，自动更新
+- **快速运行**：Go 语言实现，全量导入不到 6s
+- **增量更新**：支持增量更新数据
+- **复权计算**：视图 v_qfq_stocks 存放了前复权行情数据
+- **换手率和市值**：视图 v_turnover 存放了换手率和市值信息
 - **使用通达信券商数据**：稳定可靠，不用买积分或被限流
-- **单文件无依赖**：程序和数据库都只有一个文件，足够简单
+- **单文件无依赖**：程序和数据库都只有一个文件
 
 ## 安装说明
 
@@ -109,19 +110,17 @@ docker run --rm --platform=linux/amd64 \
 
 
 # 示例输出
-📅 日线数据的最新日期为 2025-10-23
+📅 日线数据的最新日期为 2025-11-07
 🛠 开始下载日线数据
-✅ 已下载 20251024 的数据
-🟡 20251025 非交易日或数据尚未更新
-🛠 开始转换 dayfiles 为 CSV
-🔥 转换完成
-📊 股票数据导入成功
-🛠 开始下载除权除息数据
-📈 除权除息数据更新成功
+🌲 无需下载
+🛠 开始下载股本变迁数据
+🔄 更新除权除息数据视图 (v_xdxr)
+🔄 更新市值换手数据视图 (v_turnover)
+📈 股本变迁数据更新成功
 📟 计算所有股票前收盘价
 🔢 复权因子导入成功
-🔄 创建/更新前复权数据视图 (v_qfq_stocks)
-✅ 处理完成，耗时 22.805808029s
+🔄 更新前复权数据视图 (v_qfq_stocks)
+✅ 处理完成，耗时 14.386134606s
 ```
 
 **必填参数**：
@@ -130,13 +129,13 @@ docker run --rm --platform=linux/amd64 \
 
 ### 前复权价查询
 
-**v_qfq_stocks** 视图保存了前复权数据，执行 cron 子命令时视图会自动更新：
+**v_qfq_stocks** 保存了前复权数据：
 
 ```sql
 select * from v_qfq_stocks where symbol='sz000001' order by date;
 ```
 
-**raw_adjust_factor** 表中保存了前收盘价和前复权因子，可以根据前收盘价拓展其他复权算法：
+**raw_adjust_factor** 保存了前收盘价和前复权因子，可以根据前收盘价拓展其他复权算法：
 
 ```sql
 select * from raw_adjust_factor where symbol='sz000001';
@@ -146,7 +145,7 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 ### 导出 Qlib 需要的 CSV
 
-Qlib 需要 "sh000001.csv" 命名的日线文件，前复权历史因子会变化需要单独导出因子文件，提供了一个脚本 export_for_qlib 以导出满足它要求的 csv 。
+Qlib 需要 "sh000001.csv" 命名的日线文件，前复权因子会变化需要单独导出。
 
 --fromdate 是可选参数，会导出日期后（不包含当天）的股票日线，不填时全量导出，factor 始终全量导出。
 
@@ -170,18 +169,18 @@ docker run --rm --platform=linux/amd64 --entrypoint "" \
 
 运行结束后当前目录会有 aabb 文件夹，里面有 data (股票日线 csv) 和 factor(全量复权因子 csv)，使用 dump_bin.py 处理即可。
 
-在 [quant-base](https://github.com/jing2uo/quant-base) 中有可执行的范例。
+在 [ko_trading](https://github.com/jing2uo/ko_trading) 中有可执行的范例。
 
 ### 表简介
 
 raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 
 - raw_adjust_factor: 前收盘价和前复权因子
-- raw_gbbq：股本变迁（除权除息）数据
-- raw_stocks_daily： 股票日线数据
-- v_qfq_stocks：前复权股票数据
-
-项目下 sql 目录中保存了可用于创建基本的技术指标视图的代码。
+- raw_gbbq：股本变迁数据
+- raw_stocks_daily： 股票日线
+- v_qfq_stocks：前复权股票日线
+- v_xdxr：股票除权除息记录视图
+- v_turnover：换手率和市值信息
 
 ## 备份
 
@@ -192,7 +191,7 @@ duckdb 命令使用：
 
 ```bash
 # 导出 stocks 表到 stocks.parquet
-duckdb tdx.db -s "COPY (SELECT * FROM raw_stocks_daily) TO 'stocks.parquet' (FORMAT PARQUET, COMPRESSION 'ZSTD')"
+duckdb tdx.db -s "copy (select * from raw_stocks_daily) to 'stocks.parquet' (format parquet, compression 'zstd')"
 
 # 从 stocks.parquet 重新建表
 duckdb new.db -s "create table raw_stocks_daily as select * from read_parquet('stocks.parquet');"
