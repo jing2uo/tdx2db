@@ -14,7 +14,7 @@ import (
 //go:embed  embed/*
 var embedFS embed.FS
 
-func DatatoolCreate(cacheDir string, startDate, endDate time.Time) error {
+func DatatoolDayCreate(cacheDir string, startDate, endDate time.Time) error {
 	toolPath, err := extractDatatool(cacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to extract datatool: %w", err)
@@ -26,6 +26,46 @@ func DatatoolCreate(cacheDir string, startDate, endDate time.Time) error {
 
 	//shell: ./datatool day create 20250601 20250610
 	cmd := exec.Command(toolPath, "day", "create", startDateStr, endDateStr)
+	cmd.Dir = cacheDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute datatool command: %w", err)
+	}
+
+	return nil
+}
+
+func DatatoolTickCreate(cacheDir string, startDate, endDate time.Time) error {
+	toolPath, err := extractDatatool(cacheDir)
+	if err != nil {
+		return fmt.Errorf("failed to extract datatool: %w", err)
+	}
+
+	// Format dates as YYYYMMDD
+	startDateStr := startDate.Format("20060102")
+	endDateStr := endDate.Format("20060102")
+
+	//shell: ./datatool tick create 20250601 20250610
+	cmd := exec.Command(toolPath, "tick", "create", startDateStr, endDateStr)
+	cmd.Dir = cacheDir
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to execute datatool command: %w", err)
+	}
+
+	return nil
+}
+
+func DatatoolMinCreate(cacheDir string, startDate, endDate time.Time) error {
+	toolPath, err := extractDatatool(cacheDir)
+	if err != nil {
+		return fmt.Errorf("failed to extract datatool: %w", err)
+	}
+
+	// Format dates as YYYYMMDD
+	startDateStr := startDate.Format("20060102")
+	endDateStr := endDate.Format("20060102")
+
+	//shell: ./datatool min create 20250601 20250610
+	cmd := exec.Command(toolPath, "min", "create", startDateStr, endDateStr)
 	cmd.Dir = cacheDir
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to execute datatool command: %w", err)
