@@ -40,11 +40,12 @@ type StockData struct {
 }
 
 type Factor struct {
-	Symbol   string
-	Date     time.Time
-	Close    float64
-	PreClose float64
-	Factor   float64
+	Symbol    string
+	Date      time.Time
+	Close     float64
+	PreClose  float64
+	QfqFactor float64
+	HfqFactor float64
 }
 
 type GbbqData struct {
