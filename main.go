@@ -9,6 +9,12 @@ import (
 )
 
 const dbPathInfo = "DuckDB 文件路径 (必填)"
+const dayFileInfo = ".day 文件目录路径 (必填)"
+const minLineInfo = `导入分时数据（可选，默认不处理）：
+1    导入1分钟数据
+5    导入5分钟数据
+1,5  导入1分钟和5分钟数据
+`
 
 func main() {
 	var rootCmd = &cobra.Command{
@@ -17,7 +23,7 @@ func main() {
 		SilenceErrors: true,
 	}
 
-	var dbPath, dayFileDir string
+	var dbPath, dayFileDir, minline string
 
 	var initCmd = &cobra.Command{
 		Use:   "init",
@@ -40,7 +46,14 @@ func main() {
 			if dbPath == "" {
 				return fmt.Errorf("--dbpath is required")
 			}
-			if err := cmd.Cron(dbPath); err != nil {
+
+			if c.Flags().Changed("minline") {
+				valid := map[string]bool{"1": true, "5": true, "1,5": true, "5,1": true}
+				if !valid[minline] {
+					return fmt.Errorf("--minline 允许 '1'、'5'、'1,5'、'5,1'（传入: %s）", minline)
+				}
+			}
+			if err := cmd.Cron(dbPath, minline); err != nil {
 				return err
 			}
 			return nil
@@ -48,12 +61,14 @@ func main() {
 	}
 
 	initCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
-	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", ".day 文件目录路径 (必填)")
+	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", dayFileInfo)
 	initCmd.MarkFlagRequired("dbpath")
 	initCmd.MarkFlagRequired("dayfiledir")
 
 	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
 	cronCmd.MarkFlagRequired("dbpath")
+
+	cronCmd.Flags().StringVar(&minline, "minline", "", minLineInfo)
 
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(cronCmd)

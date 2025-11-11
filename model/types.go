@@ -16,6 +16,18 @@ type DayfileRecord struct {
 	Volume uint32
 }
 
+type MinfileRecord struct {
+	DateRaw  uint16
+	TimeRaw  uint16
+	Open     uint32
+	High     uint32
+	Low      uint32
+	Close    uint32
+	Amount   float32
+	Volume   uint32
+	Reserved uint32
+}
+
 type StockData struct {
 	Symbol string
 	Open   float64

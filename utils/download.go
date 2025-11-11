@@ -9,42 +9,66 @@ import (
 	"sync"
 )
 
+// Download 封装下载任务
 type Download struct {
 	Url           string
 	Target        string
 	TotalSections int
 }
 
-func DownloadFile(url string, targetPath string) error {
-	const totalSections = 5 // Default number of sections
+// DownloadFile 下载文件并返回 HTTP 状态码。
+// 若状态码为 404 或 200，error 为 nil。
+// 若服务器不支持 Range，则自动降级为单线程下载（静默处理）。
+func DownloadFile(url string, targetPath string) (int, error) {
+	const totalSections = 5
 
-	// Create download struct
 	d := &Download{
 		Url:           url,
 		Target:        targetPath,
 		TotalSections: totalSections,
 	}
 
-	// Get file size
+	// Step 1: HEAD 获取文件元信息
 	r, err := d.getNewRequest("HEAD")
 	if err != nil {
-		return fmt.Errorf("failed to create HEAD request: %w", err)
+		return 0, fmt.Errorf("create HEAD request: %w", err)
 	}
 	res, err := http.DefaultClient.Do(r)
 	if err != nil {
-		return fmt.Errorf("failed to execute HEAD request: %w", err)
+		return 0, fmt.Errorf("execute HEAD request: %w", err)
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode > 299 {
-		return fmt.Errorf("server returned error status code: %d", res.StatusCode)
+	statusCode := res.StatusCode
+
+	if statusCode == http.StatusNotFound {
+		return 404, nil
 	}
-	size, err := strconv.Atoi(res.Header.Get("Content-Length"))
-	if err != nil || size <= 0 {
-		return fmt.Errorf("invalid content length: %s", res.Header.Get("Content-Length"))
+	if statusCode != http.StatusOK {
+		return statusCode, fmt.Errorf("unexpected status: %d", statusCode)
 	}
 
-	// Calculate sections
+	// Step 2: 检查是否能获取 Content-Length
+	size, err := strconv.Atoi(res.Header.Get("Content-Length"))
+	if err != nil || size <= 0 {
+		return d.singleThreadDownload()
+	}
+
+	// Step 3: 检查服务器是否支持 Range
+	testReq, _ := d.getNewRequest("GET")
+	testReq.Header.Set("Range", "bytes=0-0")
+	testResp, err := http.DefaultClient.Do(testReq)
+	if err != nil {
+		return 0, fmt.Errorf("range test request: %w", err)
+	}
+	defer testResp.Body.Close()
+
+	if testResp.StatusCode != http.StatusPartialContent {
+		// 不支持 Range -> 自动降级为单线程
+		return d.singleThreadDownload()
+	}
+
+	// Step 4: 执行并发下载
 	eachSize := size / d.TotalSections
 	sections := make([][2]int, d.TotalSections)
 	for i := range sections {
@@ -56,64 +80,75 @@ func DownloadFile(url string, targetPath string) error {
 		if i < d.TotalSections-1 {
 			sections[i][1] = sections[i][0] + eachSize
 		} else {
-			sections[i][1] = size - 1 // Adjust end of last section
+			sections[i][1] = size - 1
 		}
 	}
 
-	// Concurrently download sections
 	var wg sync.WaitGroup
-	for i, section := range sections {
+	var mu sync.Mutex
+	var sectionErr error
+
+	for i, sec := range sections {
 		wg.Add(1)
-		go func(i int, section [2]int) {
+		go func(i int, sec [2]int) {
 			defer wg.Done()
-			if err := d.downloadSection(i, section); err != nil {
-				fmt.Printf("Failed to download section %d: %v\n", i, err)
+			if err := d.downloadSection(i, sec); err != nil {
+				mu.Lock()
+				if sectionErr == nil {
+					sectionErr = err
+				}
+				mu.Unlock()
 			}
-		}(i, section)
+		}(i, sec)
 	}
 	wg.Wait()
 
-	// Merge sections
-	if err := d.mergeSections(sections); err != nil {
-		return fmt.Errorf("failed to merge sections: %w", err)
+	if sectionErr != nil {
+		// 自动降级
+		return d.singleThreadDownload()
 	}
 
-	return nil
+	if err := d.mergeSections(sections); err != nil {
+		return statusCode, fmt.Errorf("merge sections: %w", err)
+	}
+
+	return statusCode, nil
 }
 
 func (d *Download) getNewRequest(method string) (*http.Request, error) {
 	r, err := http.NewRequest(method, d.Url, nil)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create %s request: %w", method, err)
+		return nil, fmt.Errorf("create %s request: %w", method, err)
 	}
-	r.Header.Set("User-Agent", "Simple Downloader")
+	r.Header.Set("User-Agent", "GenericDownloader/1.0")
 	return r, nil
 }
 
 func (d *Download) downloadSection(i int, section [2]int) error {
 	r, err := d.getNewRequest("GET")
 	if err != nil {
-		return fmt.Errorf("failed to create GET request for section %d: %w", i, err)
+		return fmt.Errorf("create section %d request: %w", i, err)
 	}
 	r.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", section[0], section[1]))
+
 	resp, err := http.DefaultClient.Do(r)
 	if err != nil {
-		return fmt.Errorf("failed to execute GET request for section %d: %w", i, err)
+		return fmt.Errorf("execute section %d: %w", i, err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusPartialContent {
-		return fmt.Errorf("server does not support partial content for section %d: status code %d", i, resp.StatusCode)
+	if resp.StatusCode != http.StatusPartialContent && resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected section %d status: %d", i, resp.StatusCode)
 	}
 
 	f, err := os.Create(fmt.Sprintf("%s.part%d", d.Target, i))
 	if err != nil {
-		return fmt.Errorf("failed to create part file for section %d: %w", i, err)
+		return fmt.Errorf("create part file %d: %w", i, err)
 	}
 	defer f.Close()
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
-		return fmt.Errorf("failed to write section %d to file: %w", i, err)
+		return fmt.Errorf("write part %d: %w", i, err)
 	}
 
 	return nil
@@ -122,7 +157,7 @@ func (d *Download) downloadSection(i int, section [2]int) error {
 func (d *Download) mergeSections(sections [][2]int) error {
 	f, err := os.Create(d.Target)
 	if err != nil {
-		return fmt.Errorf("failed to create target file %s: %w", d.Target, err)
+		return fmt.Errorf("create target: %w", err)
 	}
 	defer f.Close()
 
@@ -130,14 +165,40 @@ func (d *Download) mergeSections(sections [][2]int) error {
 		partFile := fmt.Sprintf("%s.part%d", d.Target, i)
 		data, err := os.ReadFile(partFile)
 		if err != nil {
-			return fmt.Errorf("failed to read part file %s: %w", partFile, err)
+			return fmt.Errorf("read part file %s: %w", partFile, err)
 		}
 		if _, err := f.Write(data); err != nil {
-			return fmt.Errorf("failed to write part %d to target file: %w", i, err)
+			return fmt.Errorf("write part %d: %w", i, err)
 		}
-		if err := os.Remove(partFile); err != nil {
-			return fmt.Errorf("failed to remove part file %s: %w", partFile, err)
-		}
+		_ = os.Remove(partFile)
 	}
 	return nil
+}
+
+// singleThreadDownload 用于降级时的完整文件下载
+func (d *Download) singleThreadDownload() (int, error) {
+	resp, err := http.Get(d.Url)
+	if err != nil {
+		return 0, fmt.Errorf("single-thread GET: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return 404, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return resp.StatusCode, fmt.Errorf("unexpected status: %d", resp.StatusCode)
+	}
+
+	f, err := os.Create(d.Target)
+	if err != nil {
+		return resp.StatusCode, fmt.Errorf("create target: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		return resp.StatusCode, fmt.Errorf("write target: %w", err)
+	}
+
+	return resp.StatusCode, nil
 }

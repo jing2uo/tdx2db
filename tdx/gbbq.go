@@ -63,7 +63,7 @@ func GetLatestGbbqCsv(cacheDir, csvPath string) (string, error) {
 // getGbbqFile downloads and unzips the GBBQ file, returning its path.
 func getLatestGbbqFile(cacheDir string) (string, error) {
 	zipPath := filepath.Join(cacheDir, "gbbq.zip")
-	if err := utils.DownloadFile(gbbqURL, zipPath); err != nil {
+	if _, err := utils.DownloadFile(gbbqURL, zipPath); err != nil {
 		return "", fmt.Errorf("failed to download GBBQ zip file: %w", err)
 	}
 

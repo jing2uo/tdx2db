@@ -22,3 +22,5 @@ var ValidPrefixes = []string{
 	"sh000680", // 科创综指
 	"bj899050"} // 北证50
 var StockCSV = filepath.Join(DataDir, "stock.csv")
+var OneMinLineCSV = filepath.Join(DataDir, "1min.csv")
+var FiveMinLineCSV = filepath.Join(DataDir, "5min.csv")
