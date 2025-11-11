@@ -15,7 +15,8 @@ var FactorSchema = TableSchema{
 		"date DATE",
 		"close DOUBLE",
 		"pre_close DOUBLE",
-		"factor DOUBLE",
+		"qfq_factor DOUBLE",
+		"hfq_factor DOUBLE",
 	},
 }
 

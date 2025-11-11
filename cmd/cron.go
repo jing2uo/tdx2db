@@ -63,6 +63,11 @@ func Cron(dbPath string, minline string) error {
 		return fmt.Errorf("failed to create qfq view: %w", err)
 	}
 
+	fmt.Printf("🔄 更新后复权数据视图 (%s)\n", database.HfqViewName)
+	if err := database.CreateHfqView(db); err != nil {
+		return fmt.Errorf("failed to create hfq view: %w", err)
+	}
+
 	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))
 	return nil
 }
@@ -246,12 +251,14 @@ func UpdateFactors(db *sql.DB) error {
 			// 将因子格式化为 CSV 行
 			var sb strings.Builder
 			for _, factor := range factors {
-				row := fmt.Sprintf("%s,%s,%.4f,%.4f,%.4f\n",
+				row := fmt.Sprintf("%s,%s,%.4f,%.4f,%.4f,%.4f\n",
 					factor.Symbol,
 					factor.Date.Format("2006-01-02"),
 					factor.Close,
 					factor.PreClose,
-					factor.Factor)
+					factor.QfqFactor,
+					factor.HfqFactor,
+				)
 				sb.WriteString(row)
 			}
 			results <- result{sb.String(), nil}

@@ -14,7 +14,6 @@ type internalCombinedData struct {
 	Close       float64
 	PreClose    float64
 	IsTradeDay  bool
-	Factor      float64
 	Fenhong     float64
 	Peigu       float64
 	Peigujia    float64
@@ -22,9 +21,10 @@ type internalCombinedData struct {
 }
 
 func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) ([]model.Factor, error) {
-	// 如果 gbbqData 为空，说明没有除权除息事件，采用快速路径处理。
+	// 如果 xdxrData 为空，说明没有除权除息事件，采用快速路径处理。
+	// 此时，前复权和后复权的因子均为 1.0。
 	if len(xdxrData) == 0 {
-		// 确保 stockData 按日期升序排序，因为后续逻辑依赖于此顺序。
+		// 确保 stockData 按日期升序排序
 		sort.Slice(stockData, func(i, j int) bool {
 			return stockData[i].Date.Before(stockData[j].Date)
 		})
@@ -34,29 +34,29 @@ func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) (
 		}
 
 		// 直接生成结果，复权因子全部为 1.0
-		// 处理第一天的数据
 		result = append(result, model.Factor{
-			Symbol:   stockData[0].Symbol,
-			Date:     stockData[0].Date,
-			Close:    stockData[0].Close,
-			PreClose: stockData[0].Close, // 第一天的 PreClose 就是当天的 Close
-			Factor:   1.0,
+			Symbol:    stockData[0].Symbol,
+			Date:      stockData[0].Date,
+			Close:     stockData[0].Close,
+			PreClose:  stockData[0].Close, // 第一天的 PreClose 就是当天的 Close
+			QfqFactor: 1.0,
+			HfqFactor: 1.0,
 		})
 
-		// 处理剩余数据
 		for i := 1; i < len(stockData); i++ {
 			result = append(result, model.Factor{
-				Symbol:   stockData[i].Symbol,
-				Date:     stockData[i].Date,
-				Close:    stockData[i].Close,
-				PreClose: stockData[i-1].Close,
-				Factor:   1.0,
+				Symbol:    stockData[i].Symbol,
+				Date:      stockData[i].Date,
+				Close:     stockData[i].Close,
+				PreClose:  stockData[i-1].Close,
+				QfqFactor: 1.0,
+				HfqFactor: 1.0,
 			})
 		}
 		return result, nil
 	}
 
-	// 当 gbbqData 不为空时，执行完整复权计算逻辑
+	// 当 xdxrData 不为空时，执行完整复权计算逻辑
 	combined, err := calculatePreClose(stockData, xdxrData)
 	if err != nil {
 		return nil, err
@@ -66,32 +66,56 @@ func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) (
 	}
 
 	n := len(combined)
-	ratios := make([]float64, n)
+
+	// --- 1. 计算前复权因子 (QFQ) ---
+	// 逻辑：基于 (pre_close.shift(-1) / close) 的倒序累乘
+	qfqRatios := make([]float64, n)
 	for i := 0; i < n-1; i++ {
 		if combined[i].IsTradeDay && combined[i].Close != 0 {
-			ratios[i] = combined[i+1].PreClose / combined[i].Close
+			qfqRatios[i] = combined[i+1].PreClose / combined[i].Close
 		} else {
-			ratios[i] = 1.0
+			qfqRatios[i] = 1.0
 		}
 	}
-	ratios[n-1] = 1.0
+	qfqRatios[n-1] = 1.0 // 最后一天的比率是1
 
-	factors := make([]float64, n)
-	acc := 1.0
+	qfqFactors := make([]float64, n)
+	accQfq := 1.0
 	for i := n - 1; i >= 0; i-- {
-		acc *= ratios[i]
-		factors[i] = acc
+		accQfq *= qfqRatios[i]
+		qfqFactors[i] = accQfq
 	}
 
+	// --- 2. 计算后复权因子 (HFQ) ---
+	// 逻辑：基于 (close / pre_close.shift(-1)) 的正序累乘，并向下平移一位
+	hfqFactors := make([]float64, n)
+	if n > 0 {
+		hfqFactors[0] = 1.0 // 第一个因子总是 1
+		accHfq := 1.0
+		for i := 0; i < n-1; i++ {
+			var hfqRatio float64
+			if combined[i+1].PreClose != 0 {
+				hfqRatio = combined[i].Close / combined[i+1].PreClose
+			} else {
+				hfqRatio = 1.0
+			}
+			accHfq *= hfqRatio
+			hfqFactors[i+1] = accHfq
+		}
+	}
+
+	// --- 3. 组装最终结果 ---
 	result := make([]model.Factor, 0, len(stockData))
 	for i, data := range combined {
+		// 只返回实际交易日的数据
 		if data.IsTradeDay {
 			result = append(result, model.Factor{
-				Symbol:   data.Symbol,
-				Date:     data.Date,
-				Close:    data.Close,
-				PreClose: data.PreClose,
-				Factor:   factors[i],
+				Symbol:    data.Symbol,
+				Date:      data.Date,
+				Close:     data.Close,
+				PreClose:  data.PreClose,
+				QfqFactor: qfqFactors[i],
+				HfqFactor: hfqFactors[i],
 			})
 		}
 	}

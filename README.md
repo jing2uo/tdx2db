@@ -13,7 +13,7 @@
 - **快速运行**：Go 语言实现，全量导入不到 6s
 - **增量更新**：支持增量更新数据
 - **分时数据**：增量更新时可选导入 1min 和 5min 分时数据
-- **复权计算**：视图 v_qfq_stocks 存放了前复权日线行情
+- **复权计算**：增量更新时会自动计算前后复权因子和行情
 - **换手率和市值**：视图 v_turnover 存放了换手率和市值信息
 - **使用通达信数据**：稳定可靠，不用买积分或被限流
 - **单文件无依赖**：程序和数据库都只有一个文件
@@ -154,6 +154,7 @@ tdx2db cron --dbpath tdx.db --minline 1,5
 
 1. 分时数据下载和导入比较耗时，数据量极大，确认需要再开启
 2. 完整历史分时数据通达信没提供，请自行检索后使用 duckdb 导入，此工具无能为力
+3. 要得到完整的分时线，每次更新都要明确加 --minline 参数，否则会遗漏
 
 ### 表查询
 
@@ -165,22 +166,31 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 - raw_stocks_1min: 1 分钟 K 线(cron 导入后才有)
 - raw_stocks_5min: 5 分钟 K 线(cron 导入后才有)
 - v_qfq_stocks：前复权股票日线
+- v_hfq_stocks：后复权股票日线
 - v_xdxr：股票除权除息记录
 - v_turnover：换手率和市值信息
 
-**v_qfq_stocks** 保存了前复权数据：
+复权数据：
 
 ```sql
+# 前复权
 select * from v_qfq_stocks where symbol='sz000001' order by date;
+
+# 后复权
+select * from v_hfq_stocks where symbol='sz000001' order by date;
 ```
 
-**raw_adjust_factor** 保存了前收盘价和前复权因子，可以根据前收盘价拓展其他复权算法：
+前收盘价和复权因子，可以根据前收盘价拓展其他复权算法：
 
 ```sql
 select * from raw_adjust_factor where symbol='sz000001';
 ```
 
-复权原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L) , 算法来自 QUANTAXIS，复权结果和雪球、新浪两家结果一致，和同花顺及常见券商的结果不一致。
+复权原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L)
+
+算法来自 QUANTAXIS，前复权结果和雪球、新浪两家结果一致，和同花顺及常见券商的结果不一致。
+
+后复权结果只和 QUANTAXIS 计算结果一致，和雪球、新浪、同花顺不一致，和招商证券接近。
 
 分时表字段和类型如下：
 | symbol | open | high | low | close | amount | volume | datetime |
