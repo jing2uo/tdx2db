@@ -20,7 +20,6 @@ const maxConcurrency = 16
 type XdxrIndex map[string][]model.XdxrData
 
 func Cron(dbPath string, minline string) error {
-	start := time.Now()
 
 	if dbPath == "" {
 		return fmt.Errorf("database path cannot be empty")
@@ -40,22 +39,22 @@ func Cron(dbPath string, minline string) error {
 
 	err = UpdateStocksDaily(db, latestDate)
 	if err != nil {
-		return fmt.Errorf("更新日线数据失败：%w", err)
+		return fmt.Errorf("failed to update daily stock data: %w", err)
 	}
 
 	err = UpdateStocksMinLine(db, latestDate, minline)
 	if err != nil {
-		return fmt.Errorf("更新分时数据失败：%w", err)
+		return fmt.Errorf("failed to update minute-line stock data: %w", err)
 	}
 
 	err = UpdateGbbq(db)
 	if err != nil {
-		return fmt.Errorf("更新 GBBQ 数据失败：%w", err)
+		return fmt.Errorf("failed to update GBBQ: %w", err)
 	}
 
 	err = UpdateFactors(db)
 	if err != nil {
-		return fmt.Errorf("计算前收盘价和复权因子失败：%w", err)
+		return fmt.Errorf("failed to calculate factors: %w", err)
 	}
 
 	fmt.Printf("🔄 更新前复权数据视图 (%s)\n", database.QfqViewName)
@@ -68,7 +67,7 @@ func Cron(dbPath string, minline string) error {
 		return fmt.Errorf("failed to create hfq view: %w", err)
 	}
 
-	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))
+	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
 
@@ -79,10 +78,10 @@ func UpdateStocksDaily(db *sql.DB, latestDate time.Time) error {
 		startDate := validDates[0]
 		endDate := validDates[len(validDates)-1]
 		if err := tdx.DatatoolDayCreate(DataDir, startDate, endDate); err != nil {
-			return fmt.Errorf("failed to run DatatoolCreate: %w", err)
+			return fmt.Errorf("failed to run DatatoolDayCreate: %w", err)
 		}
 
-		fmt.Printf("🛠  开始转换日线文件\n")
+		fmt.Printf("🐢 开始转换日线数据\n")
 		_, err := tdx.ConvertDayfiles2Csv(filepath.Join(DataDir, "vipdoc"), ValidPrefixes, StockCSV)
 		if err != nil {
 			return fmt.Errorf("failed to convert day files to CSV: %w", err)
@@ -110,11 +109,11 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 	if len(validDates) > 0 {
 		startDate := validDates[0]
 		endDate := validDates[len(validDates)-1]
-		fmt.Printf("🛠  开始转档分笔数据\n")
+		fmt.Printf("🐢 开始转档分笔数据\n")
 		if err := tdx.DatatoolTickCreate(DataDir, startDate, endDate); err != nil {
 			return fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 		}
-		fmt.Printf("🛠  开始转换分钟数据\n")
+		fmt.Printf("🐢 开始转换分钟数据\n")
 		if err := tdx.DatatoolMinCreate(DataDir, startDate, endDate); err != nil {
 			return fmt.Errorf("failed to run DatatoolMinCreate: %w", err)
 		}
@@ -129,7 +128,7 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 
 				// Import 1min CSV
 				if err := database.Import1MinLineCsv(db, OneMinLineCSV); err != nil {
-					return fmt.Errorf("failed to import 1 minline CSV: %w", err)
+					return fmt.Errorf("failed to import 1-minute line CSV: %w", err)
 				}
 				fmt.Println("📊 1分钟数据导入成功")
 
@@ -140,7 +139,7 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 				}
 				//Import 5min CSV
 				if err := database.Import5MinLineCsv(db, FiveMinLineCSV); err != nil {
-					return fmt.Errorf("failed to import 5 minline CSV: %w", err)
+					return fmt.Errorf("failed to import 5-minute line CSV: %w", err)
 				}
 				fmt.Println("📊 5分钟数据导入成功")
 			}
@@ -154,7 +153,7 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 }
 
 func UpdateGbbq(db *sql.DB) error {
-	fmt.Println("🛠️  开始下载股本变迁数据")
+	fmt.Println("🐢 开始下载股本变迁数据")
 	if db == nil {
 		return fmt.Errorf("database connection cannot be nil")
 	}
@@ -178,7 +177,7 @@ func UpdateGbbq(db *sql.DB) error {
 		return fmt.Errorf("failed to create turnover view: %w", err)
 	}
 
-	fmt.Println("📈 股本变迁数据更新成功")
+	fmt.Println("📈 股本变迁数据导入成功")
 	return nil
 }
 
@@ -196,12 +195,12 @@ func UpdateFactors(db *sql.DB) error {
 	xdxrIndex, err := buildXdxrIndex(db)
 
 	if err != nil {
-		return fmt.Errorf("构建 GBBQ 索引失败：%w", err)
+		return fmt.Errorf("failed to build GBBQ index: %w", err)
 	}
 
 	symbols, err := database.QueryAllSymbols(db)
 	if err != nil {
-		return fmt.Errorf("查询所有符号失败：%w", err)
+		return fmt.Errorf("failed to query all stock symbols: %w", err)
 	}
 
 	// 定义结果通道
@@ -238,14 +237,14 @@ func UpdateFactors(db *sql.DB) error {
 			defer func() { <-sem }()
 			stockData, err := database.QueryStockData(db, sym, nil, nil)
 			if err != nil {
-				results <- result{"", fmt.Errorf("获取 %s 的股票数据失败：%w", sym, err)}
+				results <- result{"", fmt.Errorf("failed to query stock data for symbol %s: %w", sym, err)}
 				return
 			}
 			xdxrData := getXdxrByCode(xdxrIndex, sym)
 
 			factors, err := tdx.CalculateFqFactor(stockData, xdxrData)
 			if err != nil {
-				results <- result{"", fmt.Errorf("计算 %s 的因子失败：%w", sym, err)}
+				results <- result{"", fmt.Errorf("failed to calculate factor for symbol %s: %w", sym, err)}
 				return
 			}
 			// 将因子格式化为 CSV 行
@@ -265,7 +264,7 @@ func UpdateFactors(db *sql.DB) error {
 		}(symbol)
 	}
 
-	// 等待所有处理完成并关闭结果通道
+	// 等待所有处理n完成并关闭结果通道
 	go func() {
 		wg.Wait()
 		close(results)
@@ -287,7 +286,7 @@ func buildXdxrIndex(db *sql.DB) (XdxrIndex, error) {
 
 	xdxrData, err := database.QueryAllXdxr(db)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query Xdxr data: %v", err)
+		return nil, fmt.Errorf("failed to query xdxr data: %w", err)
 	}
 
 	for _, data := range xdxrData {
@@ -333,14 +332,14 @@ func PrepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 		fileSuffix = "tic"
 		dataTypeCN = "分时"
 	default:
-		return nil, fmt.Errorf("未知数据类型: %s", dataType)
+		return nil, fmt.Errorf("unknown data type: %s", dataType)
 	}
 
 	if err := os.MkdirAll(targetPath, 0755); err != nil {
-		return nil, fmt.Errorf("创建目录失败: %w", err)
+		return nil, fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	fmt.Printf("🛠️  开始下载%s数据\n", dataTypeCN)
+	fmt.Printf("🐢 开始下载%s数据\n", dataTypeCN)
 
 	validDates := make([]time.Time, 0, len(dates))
 

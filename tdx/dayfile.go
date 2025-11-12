@@ -38,7 +38,7 @@ func ConvertDayfiles2Csv(dayFilePath string, validPrefixes []string, outputCSV s
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("no valid .day files found in %s", dayFilePath)
+		return "", fmt.Errorf("no valid .day files found")
 	}
 
 	// Create output CSV file
@@ -103,7 +103,7 @@ func processDayFile(dayfile string) ([]string, error) {
 		return nil, fmt.Errorf("failed to access file %s: %w", dayfile, err)
 	}
 	if fileInfo.Size() == 0 {
-		return nil, fmt.Errorf("file %s is empty", dayfile)
+		return nil, nil
 	}
 
 	inFile, err := os.Open(dayfile)

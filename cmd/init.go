@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/database"
@@ -12,31 +11,31 @@ import (
 )
 
 func Init(dbPath, dayFileDir string) error {
-	start := time.Now()
 
-	// Validate inputs
 	if dbPath == "" {
 		return fmt.Errorf("database path cannot be empty")
 	}
 
-	// 新增：检查目标路径是否存在且为目录
+	fmt.Printf("📦 开始处理日线目录: %s\n", dayFileDir)
 	fileInfo, err := os.Stat(dayFileDir)
 	if os.IsNotExist(err) {
-		return fmt.Errorf("dayfiledir does not exist: %s", dayFileDir)
+		return fmt.Errorf("day file directory does not exist: %s", dayFileDir)
+	}
+	if err != nil {
+		return fmt.Errorf("error checking day file directory: %w", err)
 	}
 	if !fileInfo.IsDir() {
-		return fmt.Errorf("dayfiledir is not a directory: %s", dayFileDir)
+		return fmt.Errorf("the specified path for dayfiledir is not a directory: %s", dayFileDir)
 	}
 
-	fmt.Println("🛠️  开始转换 dayfiles 为 CSV")
+	fmt.Println("🐢 开始转换日线数据")
 	_, err = tdx.ConvertDayfiles2Csv(dayFileDir, ValidPrefixes, StockCSV)
 	if err != nil {
-		return fmt.Errorf("failed to convert .day files to CSV: %w", err)
+		return fmt.Errorf("failed to convert day files to CSV: %w", err)
 	}
 
 	fmt.Println("🔥 转换完成")
 
-	// Connect to database
 	dbConfig := model.DBConfig{Path: dbPath}
 	db, err := database.Connect(dbConfig)
 	if err != nil {
@@ -44,11 +43,9 @@ func Init(dbPath, dayFileDir string) error {
 	}
 	defer db.Close()
 
-	// Import stock CSV
 	if err := database.ImportStockCsv(db, StockCSV); err != nil {
-		return fmt.Errorf("failed to import stock data: %w", err)
+		return fmt.Errorf("failed to import stock CSV: %w", err)
 	}
-	fmt.Println("📊 股票数据导入成功")
-	fmt.Printf("✅ 处理完成，耗时 %s\n", time.Since(start))
+	fmt.Println("🚀 股票数据导入成功")
 	return nil
 }
