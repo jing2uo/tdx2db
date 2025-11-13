@@ -44,7 +44,7 @@ func ConvertMinfiles2Csv(minFilePath string, validPrefixes []string, suffix stri
 	}
 
 	if len(files) == 0 {
-		return "", fmt.Errorf("no valid minute bar files found in %s with given prefixes and suffixes", minFilePath)
+		return "", fmt.Errorf("no valid %s files found", suffix)
 	}
 
 	// 2. 创建并写入 CSV 文件头
