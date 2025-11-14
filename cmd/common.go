@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"path/filepath"
+	"time"
 
 	"github.com/jing2uo/tdx2db/utils"
 )
+
+const maxConcurrency = 16
 
 var DataDir, _ = utils.GetCacheDir()
 var ValidPrefixes = []string{
@@ -22,5 +25,8 @@ var ValidPrefixes = []string{
 	"sh000680", // 科创综指
 	"bj899050"} // 北证50
 var StockCSV = filepath.Join(DataDir, "stock.csv")
+var VipdocDir = filepath.Join(DataDir, "vipdoc")
 var OneMinLineCSV = filepath.Join(DataDir, "1min.csv")
 var FiveMinLineCSV = filepath.Join(DataDir, "5min.csv")
+
+var Today = time.Now().Truncate(24 * time.Hour)

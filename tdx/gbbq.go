@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -16,12 +15,10 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-const gbbqURL = "http://www.tdx.com.cn/products/data/data/dbf/gbbq.zip"
-
-func GetLatestGbbqCsv(cacheDir, csvPath string) (string, error) {
-	gbbqFile, err := getLatestGbbqFile(cacheDir)
+func ConvertGbbqFile2Csv(gbbqFile, csvPath string) (string, error) {
+	err := utils.CheckFile(gbbqFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to retrieve GBBQ file: %w", err)
+		return "", nil
 	}
 
 	data, err := processGbbqFile(gbbqFile)
@@ -58,21 +55,6 @@ func GetLatestGbbqCsv(cacheDir, csvPath string) (string, error) {
 	}
 
 	return csvPath, nil
-}
-
-// getGbbqFile downloads and unzips the GBBQ file, returning its path.
-func getLatestGbbqFile(cacheDir string) (string, error) {
-	zipPath := filepath.Join(cacheDir, "gbbq.zip")
-	if _, err := utils.DownloadFile(gbbqURL, zipPath); err != nil {
-		return "", fmt.Errorf("failed to download GBBQ zip file: %w", err)
-	}
-
-	unzipPath := filepath.Join(cacheDir, "gbbq-temp")
-	if err := utils.UnzipFile(zipPath, unzipPath); err != nil {
-		return "", fmt.Errorf("failed to unzip GBBQ file: %w", err)
-	}
-
-	return filepath.Join(unzipPath, "gbbq"), nil
 }
 
 func processGbbqFile(gbbqFile string) ([]model.GbbqData, error) {

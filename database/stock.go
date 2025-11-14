@@ -161,59 +161,10 @@ func QueryAllSymbols(db *sql.DB) ([]string, error) {
 	return symbols, nil
 }
 
-func GetLatestDate(db *sql.DB) (time.Time, error) {
-	query := fmt.Sprintf(
-		`SELECT symbol, MAX(date) as latest_date
-		FROM %s WHERE symbol
-		IN ('sh000001', 'sz399001', 'bj899050')
-		GROUP BY symbol;`,
-		StocksSchema.Name)
-	rows, err := db.Query(query)
+func GetStockTableLatestDate(db *sql.DB) (time.Time, error) {
+	date, err := GetLatestDateFromTable(db, StocksSchema.Name)
 	if err != nil {
-		return time.Time{}, fmt.Errorf("query execution failed: %v", err)
+		return time.Time{}, err
 	}
-	defer rows.Close()
-
-	// Map to store symbol-date pairs
-	dateMap := make(map[string]time.Time)
-	expectedSymbols := map[string]bool{
-		"sh000001": true,
-		"sz399001": true,
-		"bj899050": true,
-	}
-
-	// Collect dates for each symbol
-	for rows.Next() {
-		var symbol string
-		var date time.Time
-		if err := rows.Scan(&symbol, &date); err != nil {
-			return time.Time{}, fmt.Errorf("failed to parse date for symbol %s: %v", symbol, err)
-		}
-		dateMap[symbol] = date
-		delete(expectedSymbols, symbol)
-	}
-
-	// Check for missing symbols
-	if len(expectedSymbols) > 0 {
-		missing := make([]string, 0, len(expectedSymbols))
-		for symbol := range expectedSymbols {
-			missing = append(missing, symbol)
-		}
-		return time.Time{}, fmt.Errorf("missing data for symbols: %v", missing)
-	}
-
-	// Check date consistency
-	referenceDate := dateMap["sh000001"]
-	var inconsistent []string
-	for symbol, date := range dateMap {
-		if !date.Equal(referenceDate) {
-			inconsistent = append(inconsistent, fmt.Sprintf("%s: %s", symbol, date.Format("2006-01-02")))
-		}
-	}
-
-	if len(inconsistent) > 0 {
-		return time.Time{}, fmt.Errorf("inconsistent dates detected:\n%v", inconsistent)
-	}
-
-	return referenceDate, nil
+	return date, nil
 }

@@ -109,8 +109,8 @@ tdx2db cron --dbpath tdx.db --minline 1,5
 
 1. 分时数据下载和导入比较耗时，数据量极大，确认需要再开启
 2. 历史分时数据通达信没提供，请自行检索后使用 duckdb 导入
-3. 每次更新都要明确指定 --minline 才能得到保证分时数据完整
-4. 股票代码变更不会处理历史数据
+3. 每次更新都要明确指定 --minline 才能保证分时数据完整
+4. 股票代码变更不会处理历史记录
 
 ### 表查询
 
@@ -161,11 +161,10 @@ tdx2db convert --output ./ --m1filedir vipdoc        # 转换 .01 1分钟线文�
 tdx2db convert --output ./ --m5filedir vipdoc        # 转换 .5  5分钟线文件
 tdx2db convert --output ./ --ticzip 20251110.zip     # 转换四代 TIC
 tdx2db convert --output ./ --dayzip 20251111.zip     # 转换四代行情
+tdx2db convert --output ./ --gbbqzip gbbq.zip        # 转换股本变迁数据
 ```
 
 转换会查找目录中所有文件，包含指数、概念等很多非股票的记录，空文件会跳过处理。
-
-注意：不能修改四代行情和四代 TIC 压缩包的文件名，同名冲突时请在两个目录下操作。
 
 ## 备份
 

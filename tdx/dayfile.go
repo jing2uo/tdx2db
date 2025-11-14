@@ -15,7 +15,7 @@ import (
 
 const maxConcurrency = 16
 
-func ConvertDayfiles2Csv(dayFilePath string, validPrefixes []string, outputCSV string) (string, error) {
+func ConvertDayFiles2Csv(dayFilePath string, validPrefixes []string, outputCSV string) (string, error) {
 	// Collect matching .day files
 	var files []string
 	err := filepath.WalkDir(dayFilePath, func(path string, d os.DirEntry, err error) error {
@@ -138,7 +138,7 @@ func processDayFile(dayfile string) ([]string, error) {
 		}
 
 		for i := 0; i < n/32; i++ {
-			record, err := parseRecord(buffer[i*32 : (i+1)*32])
+			record, err := parseDayRecord(buffer[i*32 : (i+1)*32])
 			if err != nil {
 				return nil, fmt.Errorf("failed to parse record at offset %d in %s: %w", i*32, dayfile, err)
 			}
@@ -173,7 +173,7 @@ func processDayFile(dayfile string) ([]string, error) {
 	return rows, nil
 }
 
-func parseRecord(data []byte) (model.DayfileRecord, error) {
+func parseDayRecord(data []byte) (model.DayfileRecord, error) {
 	if len(data) != 32 {
 		return model.DayfileRecord{}, fmt.Errorf("invalid record length: expected 32 bytes, got %d", len(data))
 	}
