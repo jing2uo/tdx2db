@@ -14,7 +14,7 @@ import (
 )
 
 // ConvertMinfiles2Csv 遍历指定目录，将所有符合前缀和后缀条件的分钟线数据文件转换为一个CSV文件。
-func ConvertMinfiles2Csv(minFilePath string, validPrefixes []string, suffix string, outputCSV string) (string, error) {
+func ConvertMinFiles2Csv(minFilePath string, validPrefixes []string, suffix string, outputCSV string) (string, error) {
 	// 1. 收集所有匹配的分钟线文件
 	var files []string
 	err := filepath.WalkDir(minFilePath, func(path string, d os.DirEntry, err error) error {

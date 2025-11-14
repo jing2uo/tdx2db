@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
-	"time"
 
 	"github.com/jing2uo/tdx2db/tdx"
 	"github.com/jing2uo/tdx2db/utils"
@@ -14,18 +12,28 @@ import (
 
 type InputSourceType int
 
-const (
-	DayFileDir InputSourceType = iota
-	TicZip
-	DayZip
-	Min1FileDir
-	Min5FileDir
-)
-
 type ConvertOptions struct {
 	InputPath  string
 	InputType  InputSourceType
 	OutputPath string
+}
+
+const (
+	DayFileDir InputSourceType = iota
+	TicZip
+	DayZip
+	GbbqZip
+	Min1FileDir
+	Min5FileDir
+)
+
+func isDirType(t InputSourceType) bool {
+	switch t {
+	case DayFileDir, Min1FileDir, Min5FileDir:
+		return true
+	default:
+		return false
+	}
 }
 
 func Convert(opts ConvertOptions) error {
@@ -36,33 +44,32 @@ func Convert(opts ConvertOptions) error {
 		return errors.New("output path cannot be empty")
 	}
 
-	if err := checkDirWritePermission(opts.OutputPath); err != nil {
+	if err := utils.CheckOutputDir(opts.OutputPath); err != nil {
 		return err
 	}
 
+	if isDirType(opts.InputType) {
+		if err := utils.CheckDirectory(opts.InputPath); err != nil {
+			return err
+		}
+	} else {
+		if err := utils.CheckFile(opts.InputPath); err != nil {
+			return err
+		}
+	}
+
 	dataDir := DataDir
+
+	var validPrefixes = []string{"sh", "sz", "bj"}
 
 	switch opts.InputType {
 
 	case DayFileDir:
 		fmt.Printf("📦 开始处理日线目录: %s\n", opts.InputPath)
-		fileInfo, err := os.Stat(opts.InputPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("day file directory does not exist: %s", opts.InputPath)
-		}
-		if err != nil {
-			return fmt.Errorf("error checking day file directory: %w", err)
-		}
-		if !fileInfo.IsDir() {
-			return fmt.Errorf("the specified path for dayfiledir is not a directory: %s", opts.InputPath)
-		}
-
-		var ValidPrefixes = []string{"sh", "sz", "bj"}
-
 		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
 
 		fmt.Println("🐢 开始转换日线数据")
-		_, err = tdx.ConvertDayfiles2Csv(opts.InputPath, ValidPrefixes, output)
+		_, err := tdx.ConvertDayFiles2Csv(opts.InputPath, validPrefixes, output)
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -71,23 +78,10 @@ func Convert(opts ConvertOptions) error {
 
 	case Min1FileDir:
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
-		fileInfo, err := os.Stat(opts.InputPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("1min file directory does not exist: %s", opts.InputPath)
-		}
-		if err != nil {
-			return fmt.Errorf("error checking 1min file directory: %w", err)
-		}
-		if !fileInfo.IsDir() {
-			return fmt.Errorf("the specified path for m1filedir is not a directory: %s", opts.InputPath)
-		}
-
-		var ValidPrefixes = []string{"sh", "sz", "bj"}
-
 		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
 
 		fmt.Println("🐢 开始转换 1 分钟数据")
-		_, err = tdx.ConvertMinfiles2Csv(opts.InputPath, ValidPrefixes, ".01", output)
+		_, err := tdx.ConvertMinFiles2Csv(opts.InputPath, validPrefixes, ".01", output)
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
 		}
@@ -96,23 +90,10 @@ func Convert(opts ConvertOptions) error {
 
 	case Min5FileDir:
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
-		fileInfo, err := os.Stat(opts.InputPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("5min file directory does not exist: %s", opts.InputPath)
-		}
-		if err != nil {
-			return fmt.Errorf("error checking 5min file directory: %w", err)
-		}
-		if !fileInfo.IsDir() {
-			return fmt.Errorf("the specified path for m5filedir is not a directory: %s", opts.InputPath)
-		}
-
-		var ValidPrefixes = []string{"sh", "sz", "bj"}
-
 		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
 
 		fmt.Println("🐢 开始转换 5 分钟数据")
-		_, err = tdx.ConvertMinfiles2Csv(opts.InputPath, ValidPrefixes, ".5", output)
+		_, err := tdx.ConvertMinFiles2Csv(opts.InputPath, validPrefixes, ".5", output)
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
 		}
@@ -121,21 +102,11 @@ func Convert(opts ConvertOptions) error {
 
 	case TicZip:
 		fmt.Printf("📦 开始处理四代 TIC 压缩文件: %s\n", opts.InputPath)
-		_, err := os.Stat(opts.InputPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("file does not exist: %s", opts.InputPath)
-		}
 
-		baseName := filepath.Base(opts.InputPath)
-		ext := filepath.Ext(baseName)
-		dateString := strings.TrimSuffix(baseName, ext)
+		filename := filepath.Base(opts.InputPath)
+		baseName := filename[:len(filename)-len(filepath.Ext(filename))]
 
-		parsedDate, err := time.Parse("20060102", dateString)
-		if err != nil {
-			return fmt.Errorf("cannot parse date from filename '%s', please ensure the format is YYYYMMDD.zip: %w", baseName, err)
-		}
-
-		targetPath := filepath.Join(dataDir, "vipdoc", "newdatetick")
+		targetPath := filepath.Join(VipdocDir, "newdatetick")
 		if err := os.MkdirAll(targetPath, 0755); err != nil {
 			return fmt.Errorf("failed to create directory: %w", err)
 		}
@@ -144,27 +115,24 @@ func Convert(opts ConvertOptions) error {
 		}
 
 		fmt.Printf("🐢 开始转档分笔数据\n")
-		if err := tdx.DatatoolTickCreate(dataDir, parsedDate, parsedDate); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "tick", Today); err != nil {
 			return fmt.Errorf("failed to execute DatatoolTickCreate: %w", err)
 		}
-		if err := tdx.DatatoolMinCreate(dataDir, parsedDate, parsedDate); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "min", Today); err != nil {
 			return fmt.Errorf("failed to execute DatatoolMinCreate: %w", err)
 		}
 
-		dayFilesSourcePath := filepath.Join(dataDir, "vipdoc")
-		var ValidPrefixes = []string{"sh", "sz", "bj"}
-
-		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.csv", dateString))
-		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", dateString))
+		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.csv", baseName))
+		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
 		fmt.Printf("🐢 开始转换 1 分钟数据\n")
-		_, err = tdx.ConvertMinfiles2Csv(dayFilesSourcePath, ValidPrefixes, ".01", min1_output)
+		_, err := tdx.ConvertMinFiles2Csv(VipdocDir, validPrefixes, ".01", min1_output)
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
 
 		fmt.Printf("🐢 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertMinfiles2Csv(dayFilesSourcePath, ValidPrefixes, ".5", min5_output)
+		_, err = tdx.ConvertMinFiles2Csv(VipdocDir, validPrefixes, ".5", min5_output)
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
 		}
@@ -175,20 +143,11 @@ func Convert(opts ConvertOptions) error {
 
 	case DayZip:
 		fmt.Printf("📦 开始处理四代行情压缩文件: %s\n", opts.InputPath)
-		_, err := os.Stat(opts.InputPath)
-		if os.IsNotExist(err) {
-			return fmt.Errorf("file does not exist: %s", opts.InputPath)
-		}
-		baseName := filepath.Base(opts.InputPath)
-		ext := filepath.Ext(baseName)
-		dateString := strings.TrimSuffix(baseName, ext)
 
-		parsedDate, err := time.Parse("20060102", dateString)
-		if err != nil {
-			return fmt.Errorf("cannot parse date from filename '%s', please ensure the format is YYYYMMDD.zip: %w", baseName, err)
-		}
+		filename := filepath.Base(opts.InputPath)
+		baseName := filename[:len(filename)-len(filepath.Ext(filename))]
 
-		unzipDestPath := filepath.Join(dataDir, "vipdoc", "refmhq")
+		unzipDestPath := filepath.Join(VipdocDir, "refmhq")
 		if err := os.MkdirAll(unzipDestPath, 0755); err != nil {
 			return fmt.Errorf("failed to create unzip destination directory: %w", err)
 		}
@@ -197,47 +156,42 @@ func Convert(opts ConvertOptions) error {
 		}
 
 		fmt.Printf("🐢 开始转换日线数据\n")
-		if err := tdx.DatatoolDayCreate(dataDir, parsedDate, parsedDate); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "day", Today); err != nil {
 			return fmt.Errorf("failed to execute DatatoolDayCreate: %w", err)
 		}
 
-		dayFilesSourcePath := filepath.Join(dataDir, "vipdoc")
-		var ValidPrefixes = []string{"sh", "sz", "bj"}
+		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", baseName))
 
-		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", dateString))
-
-		_, err = tdx.ConvertDayfiles2Csv(dayFilesSourcePath, ValidPrefixes, output)
+		_, err := tdx.ConvertDayFiles2Csv(VipdocDir, validPrefixes, output)
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
 
 		fmt.Printf("🔥 转换完成: %s\n", output)
-	}
 
-	return nil
-}
+	case GbbqZip:
+		fmt.Printf("📦 开始处理股本变迁压缩文件: %s\n", opts.InputPath)
+		if err := utils.CheckFile(opts.InputPath); err != nil {
+			return err
 
-func checkDirWritePermission(dirPath string) error {
-	fileInfo, err := os.Stat(dirPath)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(dirPath, 0755); err != nil {
-			return fmt.Errorf("could not create output directory %s: %w", dirPath, err)
 		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("could not access output directory %s: %w", dirPath, err)
-	}
-	if !fileInfo.IsDir() {
-		return fmt.Errorf("the specified output path is not a directory: %s", dirPath)
-	}
+		unzipDestPath := filepath.Join(VipdocDir, "gbbq-temp")
+		if err := os.MkdirAll(unzipDestPath, 0755); err != nil {
+			return fmt.Errorf("failed to create unzip destination directory: %w", err)
+		}
+		if err := utils.UnzipFile(opts.InputPath, unzipDestPath); err != nil {
+			return fmt.Errorf("failed to unzip file %s: %w", opts.InputPath, err)
+		}
 
-	tmpFile, err := os.CreateTemp(dirPath, "test-")
-	if err != nil {
-		return fmt.Errorf("output directory %s is not writable: %w", dirPath, err)
+		gbbq := filepath.Join(unzipDestPath, "gbbq")
+		output := filepath.Join(opts.OutputPath, "tdx2db_gbbq.csv")
+		fmt.Printf("🐢 开始转换股本变迁数据\n")
+		_, err := tdx.ConvertGbbqFile2Csv(gbbq, output)
+		if err != nil {
+			return fmt.Errorf("failed to convert gbbq file: %w", err)
+		}
+		fmt.Printf("🔥 转换完成: %s\n", output)
 	}
-	tmpFile.Close()
-	os.Remove(tmpFile.Name())
 
 	return nil
 }

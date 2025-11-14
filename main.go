@@ -27,11 +27,12 @@ func main() {
 
 	var dbPath, dayFileDir, minline string
 	var (
-		m1FileDir  string
-		m5FileDir  string
-		ticZipFile string
-		dayZipFile string
-		outPutFile string
+		m1FileDir   string
+		m5FileDir   string
+		ticZipFile  string
+		gbbqZipFile string
+		dayZipFile  string
+		outPutFile  string
 	)
 
 	var initCmd = &cobra.Command{
@@ -76,6 +77,9 @@ func main() {
 			if c.Flags().Changed("dayzip") {
 				setFlags++
 			}
+			if c.Flags().Changed("gbbqzip") {
+				setFlags++
+			}
 			if c.Flags().Changed("m1filedir") {
 				setFlags++
 			}
@@ -84,10 +88,10 @@ func main() {
 			}
 
 			if setFlags == 0 {
-				return errors.New("必需 --dayfiledir, --m1filefir, --m5filedir 或 --ticzip,  --dayzip")
+				return errors.New("必需 --dayfiledir, --m1filefir, --m5filedir 或 --ticzip,  --dayzip, --gbbqzip")
 			}
 			if setFlags > 1 {
-				return errors.New("--dayfiledir, --m1filedir, --m5filedir, --ticzip, --dayzip 不能一起使用")
+				return errors.New("--dayfiledir, --m1filedir, --m5filedir, --ticzip, --dayzip, --gbbqzip 不能一起使用")
 			}
 			return nil
 		},
@@ -108,6 +112,9 @@ func main() {
 			} else if c.Flags().Changed("ticzip") {
 				opts.InputPath = ticZipFile
 				opts.InputType = cmd.TicZip
+			} else if c.Flags().Changed("gbbqzip") {
+				opts.InputPath = gbbqZipFile
+				opts.InputType = cmd.GbbqZip
 			} else if c.Flags().Changed("dayzip") {
 				opts.InputPath = dayZipFile
 				opts.InputType = cmd.DayZip
@@ -134,6 +141,7 @@ func main() {
 	convertCmd.Flags().StringVar(&m5FileDir, "m5filedir", "", "通达信 5 分钟 .5 文件目录")
 	convertCmd.Flags().StringVar(&ticZipFile, "ticzip", "", "通达信四代 TIC 压缩文件")
 	convertCmd.Flags().StringVar(&dayZipFile, "dayzip", "", "通达信四代行情压缩文件")
+	convertCmd.Flags().StringVar(&gbbqZipFile, "gbbqzip", "", "通达信股本变迁压缩文件")
 	convertCmd.Flags().StringVar(&outPutFile, "output", "", "CSV 文件输出目录")
 	convertCmd.MarkFlagRequired("output")
 

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/model"
@@ -100,4 +101,21 @@ func ImportCSV(db *sql.DB, schema TableSchema, csvPath string) error {
 		return fmt.Errorf("failed to import CSV to %s: %w", schema.Name, err)
 	}
 	return nil
+}
+
+func GetLatestDateFromTable(db *sql.DB, tableName string) (time.Time, error) {
+	var latestDate sql.NullTime
+
+	query := fmt.Sprintf("SELECT MAX(date) FROM %s", tableName)
+
+	err := db.QueryRow(query).Scan(&latestDate)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to query max date from %s: %w", tableName, err)
+	}
+
+	if latestDate.Valid {
+		return latestDate.Time, nil
+	}
+
+	return time.Time{}, nil
 }
