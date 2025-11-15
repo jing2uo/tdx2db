@@ -69,7 +69,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
 
 		fmt.Println("🐢 开始转换日线数据")
-		_, err := tdx.ConvertDayFiles2Csv(opts.InputPath, validPrefixes, output)
+		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -81,7 +81,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
 
 		fmt.Println("🐢 开始转换 1 分钟数据")
-		_, err := tdx.ConvertMinFiles2Csv(opts.InputPath, validPrefixes, ".01", output)
+		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
 		}
@@ -93,7 +93,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
 
 		fmt.Println("🐢 开始转换 5 分钟数据")
-		_, err := tdx.ConvertMinFiles2Csv(opts.InputPath, validPrefixes, ".5", output)
+		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
 		}
@@ -126,13 +126,13 @@ func Convert(opts ConvertOptions) error {
 		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
 		fmt.Printf("🐢 开始转换 1 分钟数据\n")
-		_, err := tdx.ConvertMinFiles2Csv(VipdocDir, validPrefixes, ".01", min1_output)
+		_, err := tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, min1_output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
 
 		fmt.Printf("🐢 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertMinFiles2Csv(VipdocDir, validPrefixes, ".5", min5_output)
+		_, err = tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, min5_output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
 		}
@@ -162,7 +162,7 @@ func Convert(opts ConvertOptions) error {
 
 		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", baseName))
 
-		_, err := tdx.ConvertDayFiles2Csv(VipdocDir, validPrefixes, output)
+		_, err := tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}

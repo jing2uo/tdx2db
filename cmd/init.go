@@ -22,7 +22,7 @@ func Init(dbPath, dayFileDir string) error {
 		return err
 	}
 	fmt.Println("🐢 开始转换日线数据")
-	_, err = tdx.ConvertDayFiles2Csv(dayFileDir, ValidPrefixes, StockCSV)
+	_, err = tdx.ConvertFiles2Csv(dayFileDir, ValidPrefixes, StockCSV, ".day")
 	if err != nil {
 		return fmt.Errorf("failed to convert day files to CSV: %w", err)
 	}
