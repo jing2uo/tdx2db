@@ -76,7 +76,7 @@ func UpdateStocksDaily(db *sql.DB, latestDate time.Time) error {
 	}
 	if len(validDates) > 0 {
 		fmt.Printf("🐢 开始转换日线数据\n")
-		_, err := tdx.ConvertDayFiles2Csv(VipdocDir, ValidPrefixes, StockCSV)
+		_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, StockCSV, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files to CSV: %w", err)
 		}
@@ -105,7 +105,7 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 		for _, p := range parts {
 			switch p {
 			case "1":
-				_, err := tdx.ConvertMinFiles2Csv(VipdocDir, ValidPrefixes, ".01", OneMinLineCSV)
+				_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, OneMinLineCSV, ".01")
 				if err != nil {
 					return fmt.Errorf("failed to convert .01 files to CSV: %w", err)
 				}
@@ -115,7 +115,7 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 				fmt.Println("📊 1分钟数据导入成功")
 
 			case "5":
-				_, err := tdx.ConvertMinFiles2Csv(VipdocDir, ValidPrefixes, ".5", FiveMinLineCSV)
+				_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, FiveMinLineCSV, ".5")
 				if err != nil {
 					return fmt.Errorf("failed to convert .5 files to CSV: %w", err)
 				}

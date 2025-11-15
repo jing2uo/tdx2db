@@ -2,14 +2,21 @@ package cmd
 
 import (
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-const maxConcurrency = 16
+var maxConcurrency = runtime.NumCPU()
+var Today = time.Now().Truncate(24 * time.Hour)
 
 var DataDir, _ = utils.GetCacheDir()
+var VipdocDir = filepath.Join(DataDir, "vipdoc")
+var StockCSV = filepath.Join(DataDir, "stock.csv")
+var OneMinLineCSV = filepath.Join(DataDir, "1min.csv")
+var FiveMinLineCSV = filepath.Join(DataDir, "5min.csv")
+
 var ValidPrefixes = []string{
 	"sz30",     // 创业板
 	"sz00",     // 深证主板
@@ -24,9 +31,3 @@ var ValidPrefixes = []string{
 	"sz399006", // 创业板指
 	"sh000680", // 科创综指
 	"bj899050"} // 北证50
-var StockCSV = filepath.Join(DataDir, "stock.csv")
-var VipdocDir = filepath.Join(DataDir, "vipdoc")
-var OneMinLineCSV = filepath.Join(DataDir, "1min.csv")
-var FiveMinLineCSV = filepath.Join(DataDir, "5min.csv")
-
-var Today = time.Now().Truncate(24 * time.Hour)
