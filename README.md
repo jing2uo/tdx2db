@@ -4,8 +4,6 @@
 
 `tdx2db` 可以将通达信数据导入到 DuckDB 中。
 
-使用 DuckDB 中数据的代码示例见: [ko_trading](https://github.com/jing2uo/ko_trading)
-
 ## 亮点
 
 - **快速运行**：Go 语言实现，全量导入不到 6s
@@ -28,7 +26,7 @@ docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 
 ### 二进制安装
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`，二进制仅支持在 Linux 中直接使用：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`，二进制**仅支持在 Linux 中**直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
@@ -175,9 +173,9 @@ duckdb 命令使用：
 
 ```bash
 # 导出 stocks 表
-duckdb tdx.db -s "copy (select * from raw_stocks_daily) to 'stocks.parquet' (format parquet, compression 'zstd')"
+duckdb tdx.db -s "copy (select * from raw_stocks_daily order by symbol,date) to 'stocks.parquet' (format parquet, compression 'zstd')"
 
-duckdb tdx.db -s "copy (select * from raw_stocks_daily) to 'stocks.csv' (format csv)"
+duckdb tdx.db -s "copy (select * from raw_stocks_daily order by symbol,date) to 'stocks.csv' (format csv)"
 
 # 从 paruet 或 csv 建表
 duckdb new.db -s "create table raw_stocks_daily as select * from read_parquet('stocks.parquet');"

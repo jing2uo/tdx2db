@@ -1,12 +1,10 @@
-# Makefile for Go CLI tool with TDX data integration and installation targets
-
 # Configuration
 TDX_URL       := https://www.tdx.com.cn/products/autoup/cyb/datatool.rar
 TMP_DIR       := .tmp
 RAR_FILE      := $(TMP_DIR)/datatool.rar
 EXTRACT_DIR   := $(TMP_DIR)/extracted
 TDX_EMBED_DIR := tdx/embed
-BIN_NAME      := tdx2db  # 二进制名称变量化
+BIN_NAME      := tdx2db
 INSTALL_DIR   := /usr/local/bin
 LOCAL_BIN     := $(HOME)/.local/bin
 
