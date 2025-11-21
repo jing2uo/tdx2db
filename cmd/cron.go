@@ -65,6 +65,19 @@ func Cron(dbPath string, minline string) error {
 		return fmt.Errorf("failed to create hfq view: %w", err)
 	}
 
+	// 更新5分钟复权视图（当minline参数包含5时）
+	if minline != "" && strings.Contains(minline, "5") {
+		fmt.Printf("🔄 更新5分钟前复权数据视图 (%s)\n", database.Qfq5MinViewName)
+		if err := database.Create5MinQfqView(db); err != nil {
+			return fmt.Errorf("failed to create 5min qfq view: %w", err)
+		}
+
+		fmt.Printf("🔄 更新5分钟后复权数据视图 (%s)\n", database.Hfq5MinViewName)
+		if err := database.Create5MinHfqView(db); err != nil {
+			return fmt.Errorf("failed to create 5min hfq view: %w", err)
+		}
+	}
+
 	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
