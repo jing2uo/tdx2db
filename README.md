@@ -50,6 +50,31 @@ Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsj
 Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
 ```
 
+*注意`linux`下载日线文件后,直接解压会导致`sh\lday\sh000001.day`,所以需要转换一下*
+```python
+python3 -c "
+import zipfile, os
+zip_file = 'hsjday.zip'
+extract_to = 'vipdoc'
+
+with zipfile.ZipFile(zip_file, 'r') as z:
+    for name in z.namelist():
+        # 将 Windows 的反斜杠替换为 Linux 的正斜杠
+        correct_name = name.replace('\\\\', '/')
+        target_path = os.path.join(extract_to, correct_name)
+        
+        # 如果是文件夹（以/结尾），直接创建
+        if correct_name.endswith('/'):
+            os.makedirs(target_path, exist_ok=True)
+        else:
+            # 如果是文件，先创建父文件夹，再写入
+            os.makedirs(os.path.dirname(target_path), exist_ok=True)
+            with open(target_path, 'wb') as f:
+                f.write(z.read(name))
+print('解压完成！')
+"
+```
+
 二进制：
 
 ```shell
