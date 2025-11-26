@@ -50,6 +50,12 @@ Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsj
 Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
 ```
 
+*注意如果`vipdoc`目录下全是类似 `sh\lday\sh000001.day` 的文件,则运行下面命令*
+```sh
+cd vipdoc
+for f in *.day; do mv "$f" "${f##*\\}"; done
+```
+
 二进制：
 
 ```shell
