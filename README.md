@@ -26,7 +26,7 @@ docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 
 ### 二进制安装
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应系统的二进制文件，解压后移至 `$PATH`，二进制**仅支持在 Linux 中**直接使用：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 Linux 中**直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
@@ -44,16 +44,13 @@ sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 # linux mac
 mkdir -p vipdoc
 wget https://data.tdx.com.cn/vipdoc/hsjday.zip && unzip -q hsjday.zip -d vipdoc
+# 若 unzip 解压后文件名如 sh\lday\sh000001.day，可以批量重命名
+# cd vipdoc
+# for f in *.day; do mv "$f" "${f##*\\}"; done
 
 # windows powershell
 Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsjday.zip"
 Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
-```
-
-*注意如果`vipdoc`目录下全是类似 `sh\lday\sh000001.day` 的文件,则运行下面命令*
-```sh
-cd vipdoc
-for f in *.day; do mv "$f" "${f##*\\}"; done
 ```
 
 二进制：
@@ -113,7 +110,7 @@ tdx2db cron --dbpath tdx.db --minline 1,5
 
 1. 分时数据下载和导入比较耗时，数据量极大，确认需要再开启
 2. 历史分时数据通达信没提供，请自行检索后使用 duckdb 导入
-3. 每次更新都要明确指定 --minline 才能保证分时数据完整
+3. 更新分时间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
 ### 表查询

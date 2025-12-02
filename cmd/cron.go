@@ -29,18 +29,12 @@ func Cron(dbPath string, minline string) error {
 	}
 	defer db.Close()
 
-	latestStockDate, err := database.GetStockTableLatestDate(db)
-	if err != nil {
-		return fmt.Errorf("failed to get latest date from database: %w", err)
-	}
-	fmt.Printf("📅 日线数据的最新日期为 %s\n", latestStockDate.Format("2006-01-02"))
-
-	err = UpdateStocksDaily(db, latestStockDate)
+	err = UpdateStocksDaily(db)
 	if err != nil {
 		return fmt.Errorf("failed to update daily stock data: %w", err)
 	}
 
-	err = UpdateStocksMinLine(db, latestStockDate, minline)
+	err = UpdateStocksMinLine(db, minline)
 	if err != nil {
 		return fmt.Errorf("failed to update minute-line stock data: %w", err)
 	}
@@ -69,7 +63,13 @@ func Cron(dbPath string, minline string) error {
 	return nil
 }
 
-func UpdateStocksDaily(db *sql.DB, latestDate time.Time) error {
+func UpdateStocksDaily(db *sql.DB) error {
+	latestDate, err := database.GetStockTableLatestDate(db)
+	if err != nil {
+		return fmt.Errorf("failed to get latest date from database: %w", err)
+	}
+	fmt.Printf("📅 日线数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
+
 	validDates, err := prepareTdxData(latestDate, "day")
 	if err != nil {
 		return fmt.Errorf("failed to prepare tdx data: %w", err)
@@ -91,17 +91,80 @@ func UpdateStocksDaily(db *sql.DB, latestDate time.Time) error {
 	return nil
 }
 
-func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error {
+func UpdateStocksMinLine(db *sql.DB, minline string) error {
 	if minline == "" {
 		return nil
+	}
+
+	parts := strings.Split(minline, ",")
+	need1Min := false
+	need5Min := false
+	for _, p := range parts {
+		if p == "1" {
+			need1Min = true
+		}
+		if p == "5" {
+			need5Min = true
+		}
+	}
+
+	var latestDate time.Time
+	yesterday := Today.AddDate(0, 0, -1)
+
+	if need1Min && need5Min {
+
+		d1, err1 := database.Get1MinTableLatestDate(db)
+		is1MinEmpty := (err1 != nil || d1.IsZero())
+
+		d5, err2 := database.Get5MinTableLatestDate(db)
+		is5MinEmpty := (err2 != nil || d5.IsZero())
+
+		if is1MinEmpty && is5MinEmpty {
+			fmt.Println("🛑 警告：数据库中没有分时数据")
+			fmt.Println("🚧 将处理今天的数据，历史请自行导入")
+			latestDate = yesterday
+
+		} else if !d1.Equal(d5) {
+			return fmt.Errorf("1分钟数据最新日期[%s] 与 5分钟数据最新日期[%s] 不同。请先单独执行 '1' 或 '5' 保持一致后再使用组合命令。",
+				d1.Format("2006-01-02"), d5.Format("2006-01-02"))
+
+		} else {
+			latestDate = d1
+			fmt.Printf("📅 分时数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
+		}
+
+	} else {
+		var typeLabel string
+
+		if need1Min {
+			latestDate, _ = database.Get1MinTableLatestDate(db)
+			typeLabel = "1分钟"
+		} else {
+			latestDate, _ = database.Get5MinTableLatestDate(db)
+			typeLabel = "5分钟"
+		}
+
+		if latestDate.IsZero() {
+			fmt.Printf("🛑 警告：数据库中没有 %s 数据\n", typeLabel)
+			fmt.Println("🚧 将处理今天的数据，历史请自行导入")
+			latestDate = yesterday
+		} else {
+			fmt.Printf("📅 %s数据最新日期为 %s\n", typeLabel, latestDate.Format("2006-01-02"))
+		}
 	}
 
 	validDates, err := prepareTdxData(latestDate, "tic")
 	if err != nil {
 		return fmt.Errorf("failed to prepare tdx data: %w", err)
 	}
+
+	if len(validDates) >= 30 {
+		return fmt.Errorf("分时数据超过30天未更新，请手动补齐后继续")
+
+	}
+
 	if len(validDates) > 0 {
-		parts := strings.Split(minline, ",")
+		fmt.Printf("🐢 开始转换分时数据\n")
 		for _, p := range parts {
 			switch p {
 			case "1":
@@ -125,10 +188,8 @@ func UpdateStocksMinLine(db *sql.DB, latestDate time.Time, minline string) error
 				fmt.Println("📊 5分钟数据导入成功")
 			}
 		}
-
 	} else {
 		fmt.Println("🌲 分时数据无需更新")
-
 	}
 	return nil
 }

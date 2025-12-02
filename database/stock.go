@@ -162,7 +162,7 @@ func QueryAllSymbols(db *sql.DB) ([]string, error) {
 }
 
 func GetStockTableLatestDate(db *sql.DB) (time.Time, error) {
-	date, err := GetLatestDateFromTable(db, StocksSchema.Name)
+	date, err := GetLatestDateFromTable(db, StocksSchema.Name, "date")
 	if err != nil {
 		return time.Time{}, err
 	}

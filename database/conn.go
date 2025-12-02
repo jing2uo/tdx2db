@@ -103,10 +103,10 @@ func ImportCSV(db *sql.DB, schema TableSchema, csvPath string) error {
 	return nil
 }
 
-func GetLatestDateFromTable(db *sql.DB, tableName string) (time.Time, error) {
+func GetLatestDateFromTable(db *sql.DB, tableName, dateColumnName string) (time.Time, error) {
 	var latestDate sql.NullTime
 
-	query := fmt.Sprintf("SELECT MAX(date) FROM %s", tableName)
+	query := fmt.Sprintf("SELECT MAX(%s) FROM %s", dateColumnName, tableName)
 
 	err := db.QueryRow(query).Scan(&latestDate)
 	if err != nil {
@@ -114,7 +114,7 @@ func GetLatestDateFromTable(db *sql.DB, tableName string) (time.Time, error) {
 	}
 
 	if latestDate.Valid {
-		return latestDate.Time, nil
+		return latestDate.Time.Truncate(24 * time.Hour), nil
 	}
 
 	return time.Time{}, nil

@@ -3,6 +3,7 @@ package database
 import (
 	"database/sql"
 	"fmt"
+	"time"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 )
@@ -40,6 +41,18 @@ func Import1MinLineCsv(db *sql.DB, csvPath string) error {
 	return nil
 }
 
+func Get1MinTableLatestDate(db *sql.DB) (time.Time, error) {
+	if err := CreateTable(db, OneMinLineSchema); err != nil {
+		return time.Time{}, fmt.Errorf("failed to create table: %w", err)
+	}
+
+	date, err := GetLatestDateFromTable(db, OneMinLineSchema.Name, "datetime")
+	if err != nil {
+		return time.Time{}, err
+	}
+	return date, nil
+}
+
 func Import5MinLineCsv(db *sql.DB, csvPath string) error {
 	if err := CreateTable(db, FiveMinLineSchema); err != nil {
 		return fmt.Errorf("failed to create table: %w", err)
@@ -50,4 +63,16 @@ func Import5MinLineCsv(db *sql.DB, csvPath string) error {
 	}
 
 	return nil
+}
+
+func Get5MinTableLatestDate(db *sql.DB) (time.Time, error) {
+	if err := CreateTable(db, FiveMinLineSchema); err != nil {
+		return time.Time{}, fmt.Errorf("failed to create table: %w", err)
+	}
+
+	date, err := GetLatestDateFromTable(db, FiveMinLineSchema.Name, "datetime")
+	if err != nil {
+		return time.Time{}, err
+	}
+	return date, nil
 }
