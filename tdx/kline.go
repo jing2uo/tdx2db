@@ -79,10 +79,8 @@ func ConvertFiles2Csv(filePath string, validPrefixes []string, outputCSV string,
 		errorMutex.Unlock()
 	}
 
-	// 5. 启动消费者 (CSV写入器) Goroutine
-	consumerWg.Add(1)
-	go func() {
-		defer consumerWg.Done()
+	// 消费者：批量写入文件
+	consumerWg.Go(func() {
 		batch := make([]string, 0, writeBatchSize)
 
 		for data := range rowChan {
@@ -95,35 +93,30 @@ func ConvertFiles2Csv(filePath string, validPrefixes []string, outputCSV string,
 				if err := writeBatchToFile(outFile, batch); err != nil {
 					collectError(err)
 				}
-				batch = batch[:0] // 高效清空切片
+				batch = batch[:0]
 			}
 		}
 
-		// 处理最后一个未满的批次
 		if len(batch) > 0 {
 			if err := writeBatchToFile(outFile, batch); err != nil {
 				collectError(err)
 			}
 		}
-	}()
+	})
 
-	// 6. 启动生产者 (文件读取器) Goroutines
+	// 生产者：bounded concurrency
 	for _, file := range files {
-		producerWg.Add(1)
-		sem <- struct{}{}
-		go func(filename string) {
-			defer func() {
-				<-sem
-				producerWg.Done()
-			}()
-			// 调用通用的文件处理函数，它会将结果发送到channel
-			processAndProduce(filename, suffix, rowChan, recordProcessor)
-		}(file)
+		file := file // 避免循环变量捕获
+		producerWg.Go(func() {
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			processAndProduce(file, suffix, rowChan, recordProcessor)
+		})
 	}
 
-	// 7. 等待所有任务完成
 	producerWg.Wait()
-	close(rowChan) // 关闭channel，通知消费者没有更多数据了
+	close(rowChan)
 	consumerWg.Wait()
 
 	if len(errors) > 0 {

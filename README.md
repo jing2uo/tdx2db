@@ -6,13 +6,11 @@
 
 ## 亮点
 
-- **快速运行**：Go 语言实现，全量导入不到 6s
 - **增量更新**：支持间隔数天后数据补全
-- **分时数据**：增量更新可选导入 1min 和 5min 分时数据
-- **复权计算**：增量更新会自动计算前后复权因子和行情
-- **换手率和市值**：视图 v_turnover 存放了换手率和市值信息
-- **使用通达信数据**：稳定可靠，不用买积分或被限流
-- **单文件无依赖**：程序和数据库都只有一个文件
+- **分时数据**：可选导入 1min 和 5min 分时数据
+- **复权计算**：自动计算前后复权因子，且因子支持分时使用
+- **换手率和市值**：自动计算换手率和市值信息
+- **通达信数据**：稳定可靠，不用买积分或被限流
 
 ## 安装说明
 
@@ -24,9 +22,9 @@
 docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 ```
 
-### 二进制安装
+### 使用二进制
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 Linux 中**直接使用：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 Linux x86_64 中**直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
@@ -44,6 +42,7 @@ sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 # linux mac
 mkdir -p vipdoc
 wget https://data.tdx.com.cn/vipdoc/hsjday.zip && unzip -q hsjday.zip -d vipdoc
+
 # 若 unzip 解压后文件名如 sh\lday\sh000001.day，可以批量重命名
 # cd vipdoc
 # for f in *.day; do mv "$f" "${f##*\\}"; done

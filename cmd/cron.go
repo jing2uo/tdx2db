@@ -257,9 +257,7 @@ func UpdateFactors(db *sql.DB) error {
 
 	// 启动写入协程
 	var writerWg sync.WaitGroup
-	writerWg.Add(1)
-	go func() {
-		defer writerWg.Done()
+	writerWg.Go(func() {
 		for res := range results {
 			if res.err != nil {
 				fmt.Printf("错误：%v\n", res.err)
@@ -269,7 +267,7 @@ func UpdateFactors(db *sql.DB) error {
 				fmt.Printf("写入 CSV 失败：%v\n", err)
 			}
 		}
-	}()
+	})
 
 	// 并发处理每个符号
 	for _, symbol := range symbols {
