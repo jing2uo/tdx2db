@@ -49,14 +49,35 @@ func Cron(dbPath string, minline string) error {
 		return fmt.Errorf("failed to calculate factors: %w", err)
 	}
 
-	fmt.Printf("🔄 更新前复权数据视图 (%s)\n", database.QfqViewName)
+	fmt.Println("🔄 更新复权数据视图")
 	if err := database.CreateQfqView(db); err != nil {
 		return fmt.Errorf("failed to create qfq view: %w", err)
 	}
 
-	fmt.Printf("🔄 更新后复权数据视图 (%s)\n", database.HfqViewName)
 	if err := database.CreateHfqView(db); err != nil {
 		return fmt.Errorf("failed to create hfq view: %w", err)
+	}
+
+	if exists, _ := database.TableExists(db, database.OneMinLineSchema.Name); exists {
+		if err := database.Create1MinQfqView(db); err != nil {
+			return fmt.Errorf("failed to create 1min qfq view: %w", err)
+		}
+
+		if err := database.Create1MinHfqView(db); err != nil {
+			return fmt.Errorf("failed to create 1min hfq view: %w", err)
+		}
+
+	}
+
+	if exists, _ := database.TableExists(db, database.FiveMinLineSchema.Name); exists {
+		if err := database.Create5MinQfqView(db); err != nil {
+			return fmt.Errorf("failed to create 5min qfq view: %w", err)
+		}
+
+		if err := database.Create5MinHfqView(db); err != nil {
+			return fmt.Errorf("failed to create 5min hfq view: %w", err)
+		}
+
 	}
 
 	fmt.Println("🚀 今日任务执行成功")
@@ -210,12 +231,10 @@ func UpdateGbbq(db *sql.DB) error {
 		return fmt.Errorf("failed to import GBBQ CSV into database: %w", err)
 	}
 
-	fmt.Printf("🔄 更新除权除息数据视图 (%s)\n", database.XdxrViewName)
 	if err := database.CreateXdxrView(db); err != nil {
 		return fmt.Errorf("failed to create xdxr view: %w", err)
 	}
 
-	fmt.Printf("🔄 更新市值换手数据视图 (%s)\n", database.TurnoverViewName)
 	if err := database.CreateTurnoverView(db); err != nil {
 		return fmt.Errorf("failed to create turnover view: %w", err)
 	}

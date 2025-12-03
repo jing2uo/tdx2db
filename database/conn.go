@@ -119,3 +119,15 @@ func GetLatestDateFromTable(db *sql.DB, tableName, dateColumnName string) (time.
 
 	return time.Time{}, nil
 }
+
+func TableExists(db *sql.DB, tableName string) (bool, error) {
+	query := `SELECT count(*) FROM information_schema.tables WHERE table_name = ?`
+
+	var count int
+	err := db.QueryRow(query, tableName).Scan(&count)
+	if err != nil {
+		return false, fmt.Errorf("failed to check existence of table %s: %w", tableName, err)
+	}
+
+	return count > 0, nil
+}
