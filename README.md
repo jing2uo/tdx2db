@@ -119,12 +119,12 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 - raw_adjust_factor: 前收盘价和前复权因子
 - raw_gbbq：股本变迁数据
 - raw_stocks_daily： 股票日线
-- raw_stocks_1min: 1 分钟 K 线(cron 导入后才有)
-- raw_stocks_5min: 5 分钟 K 线(cron 导入后才有)
-- v_qfq_stocks：前复权股票日线
-- v_hfq_stocks：后复权股票日线
+- raw_stocks_1min: 1 分钟 K 线
+- raw_stocks_5min: 5 分钟 K 线
 - v_xdxr：股票除权除息记录
 - v_turnover：换手率和市值信息
+- v_qfq_daily|min：前复权数据
+- v_hfq_daily|min：后复权数据
 
 复权数据：
 

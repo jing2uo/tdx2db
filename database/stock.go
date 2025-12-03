@@ -23,8 +23,8 @@ var StocksSchema = TableSchema{
 	},
 }
 
-var QfqViewName = "v_qfq_stocks"
-var HfqViewName = "v_hfq_stocks"
+var QfqViewName = "v_qfq_daily"
+var HfqViewName = "v_hfq_daily"
 
 func CreateQfqView(db *sql.DB) error {
 	query := fmt.Sprintf(`
