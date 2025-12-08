@@ -42,8 +42,8 @@ func ConvertGbbqFile2Csv(gbbqFile, csvPath string) (string, error) {
 	for _, stock := range data {
 		row := []string{
 			fmt.Sprintf("%d", stock.Category),
-			stock.Date.Format("2006-01-02"),
 			stock.Code,
+			stock.Date.Format("2006-01-02"),
 			fmt.Sprintf("%f", stock.C1),
 			fmt.Sprintf("%f", stock.C2),
 			fmt.Sprintf("%f", stock.C3),

@@ -22,6 +22,7 @@ require (
 	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jmoiron/sqlx v1.4.0 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect

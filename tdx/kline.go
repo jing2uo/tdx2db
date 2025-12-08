@@ -10,16 +10,34 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-
-	"github.com/jing2uo/tdx2db/model"
 )
 
 var maxConcurrency = runtime.NumCPU()
 
-// RowData 用于在生产者和消费者之间传递单行CSV数据或错误。
-type RowData struct {
+type rowData struct {
 	Line string
 	Err  error
+}
+
+type dayfileRecord struct {
+	Date   uint32
+	Open   uint32
+	High   uint32
+	Low    uint32
+	Close  uint32
+	Amount float32
+	Volume uint32
+}
+
+type minfileRecord struct {
+	DateRaw uint16
+	TimeRaw uint16
+	Open    uint32
+	High    uint32
+	Low     uint32
+	Close   uint32
+	Amount  float32
+	Volume  uint32
 }
 
 const (
@@ -66,7 +84,7 @@ func ConvertFiles2Csv(filePath string, validPrefixes []string, outputCSV string,
 	}
 
 	// 4. 设置生产者-消费者模型
-	rowChan := make(chan RowData, 1024)
+	rowChan := make(chan rowData, 1024)
 	var producerWg sync.WaitGroup
 	var consumerWg sync.WaitGroup
 	sem := make(chan struct{}, maxConcurrency)
@@ -154,10 +172,10 @@ func collectFiles(filePath string, validPrefixes []string, suffix string) ([]str
 }
 
 // processAndProduce 读取单个文件，使用指定的处理器函数解析记录，并将结果发送到channel。
-func processAndProduce(filename, suffix string, rowChan chan<- RowData, processor func([]byte, string) (string, error)) {
+func processAndProduce(filename, suffix string, rowChan chan<- rowData, processor func([]byte, string) (string, error)) {
 	fileInfo, err := os.Stat(filename)
 	if err != nil {
-		rowChan <- RowData{Err: fmt.Errorf("could not stat file %s: %w", filename, err)}
+		rowChan <- rowData{Err: fmt.Errorf("could not stat file %s: %w", filename, err)}
 		return
 	}
 	if fileInfo.Size() == 0 {
@@ -166,7 +184,7 @@ func processAndProduce(filename, suffix string, rowChan chan<- RowData, processo
 
 	inFile, err := os.Open(filename)
 	if err != nil {
-		rowChan <- RowData{Err: fmt.Errorf("failed to open file %s: %w", filename, err)}
+		rowChan <- rowData{Err: fmt.Errorf("failed to open file %s: %w", filename, err)}
 		return
 	}
 	defer inFile.Close()
@@ -180,11 +198,11 @@ func processAndProduce(filename, suffix string, rowChan chan<- RowData, processo
 			break
 		}
 		if err != nil {
-			rowChan <- RowData{Err: fmt.Errorf("failed to read file %s: %w", filename, err)}
+			rowChan <- rowData{Err: fmt.Errorf("failed to read file %s: %w", filename, err)}
 			return
 		}
 		if n%recordSize != 0 {
-			rowChan <- RowData{Err: fmt.Errorf("invalid file format in %s: data length %d is not a multiple of %d", filename, n, recordSize)}
+			rowChan <- rowData{Err: fmt.Errorf("invalid file format in %s: data length %d is not a multiple of %d", filename, n, recordSize)}
 			return
 		}
 
@@ -193,10 +211,10 @@ func processAndProduce(filename, suffix string, rowChan chan<- RowData, processo
 			csvLine, err := processor(recordBytes, symbol)
 			if err != nil {
 				// 发送错误，但继续处理文件中的其他记录
-				rowChan <- RowData{Err: fmt.Errorf("failed to process record in %s: %w", filename, err)}
+				rowChan <- rowData{Err: fmt.Errorf("failed to process record in %s: %w", filename, err)}
 				continue
 			}
-			rowChan <- RowData{Line: csvLine}
+			rowChan <- rowData{Line: csvLine}
 		}
 	}
 }
@@ -212,7 +230,7 @@ func writeBatchToFile(file *os.File, batch []string) error {
 // --- 特定记录处理函数 ---
 
 func processDayRecord(data []byte, symbol string) (string, error) {
-	var record model.DayfileRecord
+	var record dayfileRecord
 	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &record); err != nil {
 		return "", fmt.Errorf("binary read failed: %w", err)
 	}
@@ -232,7 +250,7 @@ func processDayRecord(data []byte, symbol string) (string, error) {
 }
 
 func processMinRecord(data []byte, symbol string) (string, error) {
-	var record model.MinfileRecord
+	var record minfileRecord
 	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &record); err != nil {
 		return "", fmt.Errorf("binary read failed: %w", err)
 	}
