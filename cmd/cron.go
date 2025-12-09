@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jing2uo/tdx2db/calc"
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
 	"github.com/jing2uo/tdx2db/tdx"
@@ -22,9 +22,24 @@ func Cron(dbPath string, minline string) error {
 	if dbPath == "" {
 		return fmt.Errorf("database path cannot be empty")
 	}
-	dbConfig := model.DBConfig{Path: dbPath}
-	db, err := database.Connect(dbConfig)
+
+	dbConfig := model.DBConfig{
+		DSN:  dbPath,
+		Type: model.DBTypeDuckDB,
+	}
+
+	// 2. 创建驱动实例
+	db, err := database.NewDatabase(dbConfig)
 	if err != nil {
+		return fmt.Errorf("failed to create database driver: %w", err)
+	}
+
+	// 防御性编程：虽然有 err 检查，但再检查一次 nil 更稳妥
+	if db == nil {
+		return fmt.Errorf("database driver is nil even though no error was returned")
+	}
+	// 2. 连接数据库
+	if err := db.Connect(); err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 	defer db.Close()
@@ -49,43 +64,12 @@ func Cron(dbPath string, minline string) error {
 		return fmt.Errorf("failed to calculate factors: %w", err)
 	}
 
-	fmt.Println("🔄 更新复权数据视图")
-	if err := database.CreateQfqView(db); err != nil {
-		return fmt.Errorf("failed to create qfq view: %w", err)
-	}
-
-	if err := database.CreateHfqView(db); err != nil {
-		return fmt.Errorf("failed to create hfq view: %w", err)
-	}
-
-	if exists, _ := database.TableExists(db, database.OneMinLineSchema.Name); exists {
-		if err := database.Create1MinQfqView(db); err != nil {
-			return fmt.Errorf("failed to create 1min qfq view: %w", err)
-		}
-
-		if err := database.Create1MinHfqView(db); err != nil {
-			return fmt.Errorf("failed to create 1min hfq view: %w", err)
-		}
-
-	}
-
-	if exists, _ := database.TableExists(db, database.FiveMinLineSchema.Name); exists {
-		if err := database.Create5MinQfqView(db); err != nil {
-			return fmt.Errorf("failed to create 5min qfq view: %w", err)
-		}
-
-		if err := database.Create5MinHfqView(db); err != nil {
-			return fmt.Errorf("failed to create 5min hfq view: %w", err)
-		}
-
-	}
-
 	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
 
-func UpdateStocksDaily(db *sql.DB) error {
-	latestDate, err := database.GetStockTableLatestDate(db)
+func UpdateStocksDaily(db database.DataRepository) error {
+	latestDate, err := db.GetLatestDate(model.TableStocksDaily.TableName, "date")
 	if err != nil {
 		return fmt.Errorf("failed to get latest date from database: %w", err)
 	}
@@ -101,7 +85,7 @@ func UpdateStocksDaily(db *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("failed to convert day files to CSV: %w", err)
 		}
-		if err := database.ImportStockCsv(db, StockCSV); err != nil {
+		if err := db.ImportDailyStocks(StockCSV); err != nil {
 			return fmt.Errorf("failed to import stock CSV: %w", err)
 		}
 		fmt.Println("📊 日线数据导入成功")
@@ -112,7 +96,7 @@ func UpdateStocksDaily(db *sql.DB) error {
 	return nil
 }
 
-func UpdateStocksMinLine(db *sql.DB, minline string) error {
+func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 	if minline == "" {
 		return nil
 	}
@@ -134,10 +118,10 @@ func UpdateStocksMinLine(db *sql.DB, minline string) error {
 
 	if need1Min && need5Min {
 
-		d1, err1 := database.Get1MinTableLatestDate(db)
+		d1, err1 := db.GetLatestDate(model.TableStocks1Min.TableName, "datetime")
 		is1MinEmpty := (err1 != nil || d1.IsZero())
 
-		d5, err2 := database.Get5MinTableLatestDate(db)
+		d5, err2 := db.GetLatestDate(model.TableStocks5Min.TableName, "datetime")
 		is5MinEmpty := (err2 != nil || d5.IsZero())
 
 		if is1MinEmpty && is5MinEmpty {
@@ -158,10 +142,10 @@ func UpdateStocksMinLine(db *sql.DB, minline string) error {
 		var typeLabel string
 
 		if need1Min {
-			latestDate, _ = database.Get1MinTableLatestDate(db)
+			latestDate, _ = db.GetLatestDate(model.TableStocks1Min.TableName, "datetime")
 			typeLabel = "1分钟"
 		} else {
-			latestDate, _ = database.Get5MinTableLatestDate(db)
+			latestDate, _ = db.GetLatestDate(model.TableStocks5Min.TableName, "datetime")
 			typeLabel = "5分钟"
 		}
 
@@ -193,7 +177,7 @@ func UpdateStocksMinLine(db *sql.DB, minline string) error {
 				if err != nil {
 					return fmt.Errorf("failed to convert .01 files to CSV: %w", err)
 				}
-				if err := database.Import1MinLineCsv(db, OneMinLineCSV); err != nil {
+				if err := db.Import1MinStocks(OneMinLineCSV); err != nil {
 					return fmt.Errorf("failed to import 1-minute line CSV: %w", err)
 				}
 				fmt.Println("📊 1分钟数据导入成功")
@@ -203,7 +187,7 @@ func UpdateStocksMinLine(db *sql.DB, minline string) error {
 				if err != nil {
 					return fmt.Errorf("failed to convert .5 files to CSV: %w", err)
 				}
-				if err := database.Import5MinLineCsv(db, FiveMinLineCSV); err != nil {
+				if err := db.Import5MinStocks(FiveMinLineCSV); err != nil {
 					return fmt.Errorf("failed to import 5-minute line CSV: %w", err)
 				}
 				fmt.Println("📊 5分钟数据导入成功")
@@ -215,7 +199,7 @@ func UpdateStocksMinLine(db *sql.DB, minline string) error {
 	return nil
 }
 
-func UpdateGbbq(db *sql.DB) error {
+func UpdateGbbq(db database.DataRepository) error {
 	fmt.Println("🐢 开始下载股本变迁数据")
 
 	gbbqFile, err := getGbbqFile(DataDir)
@@ -227,23 +211,15 @@ func UpdateGbbq(db *sql.DB) error {
 		return fmt.Errorf("failed to convert GBBQ to CSV: %w", err)
 	}
 
-	if err := database.ImportGbbqCsv(db, gbbqCSV); err != nil {
+	if err := db.ImportGBBQ(gbbqCSV); err != nil {
 		return fmt.Errorf("failed to import GBBQ CSV into database: %w", err)
-	}
-
-	if err := database.CreateXdxrView(db); err != nil {
-		return fmt.Errorf("failed to create xdxr view: %w", err)
-	}
-
-	if err := database.CreateTurnoverView(db); err != nil {
-		return fmt.Errorf("failed to create turnover view: %w", err)
 	}
 
 	fmt.Println("📈 股本变迁数据导入成功")
 	return nil
 }
 
-func UpdateFactors(db *sql.DB) error {
+func UpdateFactors(db database.DataRepository) error {
 	csvPath := filepath.Join(DataDir, "factors.csv")
 
 	outFile, err := os.Create(csvPath)
@@ -260,7 +236,7 @@ func UpdateFactors(db *sql.DB) error {
 		return fmt.Errorf("failed to build GBBQ index: %w", err)
 	}
 
-	symbols, err := database.QueryAllSymbols(db)
+	symbols, err := db.GetAllSymbols()
 	if err != nil {
 		return fmt.Errorf("failed to query all stock symbols: %w", err)
 	}
@@ -295,14 +271,14 @@ func UpdateFactors(db *sql.DB) error {
 		go func(sym string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			stockData, err := database.QueryStockData(db, sym, nil, nil)
+			stockData, err := db.QueryStockData(sym, nil, nil)
 			if err != nil {
 				results <- result{"", fmt.Errorf("failed to query stock data for symbol %s: %w", sym, err)}
 				return
 			}
 			xdxrData := getXdxrByCode(xdxrIndex, sym)
 
-			factors, err := tdx.CalculateFqFactor(stockData, xdxrData)
+			factors, err := calc.CalculateFqFactor(stockData, xdxrData)
 			if err != nil {
 				results <- result{"", fmt.Errorf("failed to calculate factor for symbol %s: %w", sym, err)}
 				return
@@ -333,7 +309,7 @@ func UpdateFactors(db *sql.DB) error {
 	// 等待写入协程完成
 	writerWg.Wait()
 
-	if err := database.ImportFactorCsv(db, csvPath); err != nil {
+	if err := db.ImportAdjustFactors(csvPath); err != nil {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 	fmt.Println("🔢 复权因子导入成功")
@@ -341,10 +317,10 @@ func UpdateFactors(db *sql.DB) error {
 	return nil
 }
 
-func buildXdxrIndex(db *sql.DB) (XdxrIndex, error) {
+func buildXdxrIndex(db database.DataRepository) (XdxrIndex, error) {
 	index := make(XdxrIndex)
 
-	xdxrData, err := database.QueryAllXdxr(db)
+	xdxrData, err := db.QueryAllXdxr()
 	if err != nil {
 		return nil, fmt.Errorf("failed to query xdxr data: %w", err)
 	}
