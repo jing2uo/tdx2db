@@ -58,7 +58,7 @@ func Convert(opts ConvertOptions) error {
 		}
 	}
 
-	dataDir := DataDir
+	dataDir := TempDir
 
 	var validPrefixes = []string{"sh", "sz", "bj"}
 
@@ -66,10 +66,10 @@ func Convert(opts ConvertOptions) error {
 
 	case DayFileDir:
 		fmt.Printf("📦 开始处理日线目录: %s\n", opts.InputPath)
-		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
+		output := filepath.Join(opts.OutputPath, "tdx2db_day.parquet")
 
 		fmt.Println("🐢 开始转换日线数据")
-		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToParquet(opts.InputPath, validPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -78,10 +78,10 @@ func Convert(opts ConvertOptions) error {
 
 	case Min1FileDir:
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
-		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
+		output := filepath.Join(opts.OutputPath, "tdx2db_1min.parquet")
 
 		fmt.Println("🐢 开始转换 1 分钟数据")
-		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".01")
+		_, err := tdx.ConvertFilesToParquet(opts.InputPath, validPrefixes, output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
 		}
@@ -90,10 +90,10 @@ func Convert(opts ConvertOptions) error {
 
 	case Min5FileDir:
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
-		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
+		output := filepath.Join(opts.OutputPath, "tdx2db_5min.parquet")
 
 		fmt.Println("🐢 开始转换 5 分钟数据")
-		_, err := tdx.ConvertFiles2Csv(opts.InputPath, validPrefixes, output, ".5")
+		_, err := tdx.ConvertFilesToParquet(opts.InputPath, validPrefixes, output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
 		}
@@ -122,17 +122,17 @@ func Convert(opts ConvertOptions) error {
 			return fmt.Errorf("failed to execute DatatoolMinCreate: %w", err)
 		}
 
-		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.csv", baseName))
-		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
+		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.parquet", baseName))
+		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.parquet", baseName))
 
 		fmt.Printf("🐢 开始转换 1 分钟数据\n")
-		_, err := tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, min1_output, ".01")
+		_, err := tdx.ConvertFilesToParquet(VipdocDir, validPrefixes, min1_output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
 
 		fmt.Printf("🐢 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, min5_output, ".5")
+		_, err = tdx.ConvertFilesToParquet(VipdocDir, validPrefixes, min5_output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
 		}
@@ -160,9 +160,9 @@ func Convert(opts ConvertOptions) error {
 			return fmt.Errorf("failed to execute DatatoolDayCreate: %w", err)
 		}
 
-		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", baseName))
+		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.parquet", baseName))
 
-		_, err := tdx.ConvertFiles2Csv(VipdocDir, validPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToParquet(VipdocDir, validPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -184,9 +184,9 @@ func Convert(opts ConvertOptions) error {
 		}
 
 		gbbq := filepath.Join(unzipDestPath, "gbbq")
-		output := filepath.Join(opts.OutputPath, "tdx2db_gbbq.csv")
+		output := filepath.Join(opts.OutputPath, "tdx2db_gbbq.parquet")
 		fmt.Printf("🐢 开始转换股本变迁数据\n")
-		_, err := tdx.ConvertGbbqFile2Csv(gbbq, output)
+		_, err := tdx.ConvertGbbqFileToParquet(gbbq, output)
 		if err != nil {
 			return fmt.Errorf("failed to convert gbbq file: %w", err)
 		}

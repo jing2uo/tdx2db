@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/jing2uo/tdx2db/calc"
@@ -81,12 +80,12 @@ func UpdateStocksDaily(db database.DataRepository) error {
 	}
 	if len(validDates) > 0 {
 		fmt.Printf("🐢 开始转换日线数据\n")
-		_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, StockCSV, ".day")
+		_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, StockDailyParquet, ".day")
 		if err != nil {
-			return fmt.Errorf("failed to convert day files to CSV: %w", err)
+			return fmt.Errorf("failed to convert day files to parquet: %w", err)
 		}
-		if err := db.ImportDailyStocks(StockCSV); err != nil {
-			return fmt.Errorf("failed to import stock CSV: %w", err)
+		if err := db.ImportDailyStocks(StockDailyParquet); err != nil {
+			return fmt.Errorf("failed to import stock parquet: %w", err)
 		}
 		fmt.Println("📊 日线数据导入成功")
 	} else {
@@ -173,22 +172,22 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 		for _, p := range parts {
 			switch p {
 			case "1":
-				_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, OneMinLineCSV, ".01")
+				_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, Stock1MinParquet, ".01")
 				if err != nil {
-					return fmt.Errorf("failed to convert .01 files to CSV: %w", err)
+					return fmt.Errorf("failed to convert .01 files to parquet: %w", err)
 				}
-				if err := db.Import1MinStocks(OneMinLineCSV); err != nil {
-					return fmt.Errorf("failed to import 1-minute line CSV: %w", err)
+				if err := db.Import1MinStocks(Stock1MinParquet); err != nil {
+					return fmt.Errorf("failed to import 1-minute line parquet: %w", err)
 				}
 				fmt.Println("📊 1分钟数据导入成功")
 
 			case "5":
-				_, err := tdx.ConvertFiles2Csv(VipdocDir, ValidPrefixes, FiveMinLineCSV, ".5")
+				_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, Stock5MinParquet, ".5")
 				if err != nil {
-					return fmt.Errorf("failed to convert .5 files to CSV: %w", err)
+					return fmt.Errorf("failed to convert .5 files to parquet: %w", err)
 				}
-				if err := db.Import5MinStocks(FiveMinLineCSV); err != nil {
-					return fmt.Errorf("failed to import 5-minute line CSV: %w", err)
+				if err := db.Import5MinStocks(Stock5MinParquet); err != nil {
+					return fmt.Errorf("failed to import 5-minute line parquet: %w", err)
 				}
 				fmt.Println("📊 5分钟数据导入成功")
 			}
@@ -202,17 +201,17 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 func UpdateGbbq(db database.DataRepository) error {
 	fmt.Println("🐢 开始下载股本变迁数据")
 
-	gbbqFile, err := getGbbqFile(DataDir)
+	gbbqFile, err := getGbbqFile(TempDir)
 	if err != nil {
 		return fmt.Errorf("failed to download GBBQ file: %w", err)
 	}
-	gbbqCSV := filepath.Join(DataDir, "gbbq.csv")
-	if _, err := tdx.ConvertGbbqFile2Csv(gbbqFile, gbbqCSV); err != nil {
-		return fmt.Errorf("failed to convert GBBQ to CSV: %w", err)
+	gbbqParquet := filepath.Join(TempDir, "gbbq.parquet")
+	if _, err := tdx.ConvertGbbqFileToParquet(gbbqFile, gbbqParquet); err != nil {
+		return fmt.Errorf("failed to convert GBBQ to parquet: %w", err)
 	}
 
-	if err := db.ImportGBBQ(gbbqCSV); err != nil {
-		return fmt.Errorf("failed to import GBBQ CSV into database: %w", err)
+	if err := db.ImportGBBQ(gbbqParquet); err != nil {
+		return fmt.Errorf("failed to import GBBQ parquet into database: %w", err)
 	}
 
 	fmt.Println("📈 股本变迁数据导入成功")
@@ -220,125 +219,16 @@ func UpdateGbbq(db database.DataRepository) error {
 }
 
 func UpdateFactors(db database.DataRepository) error {
-	csvPath := filepath.Join(DataDir, "factors.csv")
-
-	outFile, err := os.Create(csvPath)
-	if err != nil {
-		return fmt.Errorf("failed to create CSV file %s: %w", csvPath, err)
-	}
-	defer outFile.Close()
+	parquetPath := filepath.Join(TempDir, "factors.parquet")
 
 	fmt.Println("📟 计算所有股票前收盘价")
-	// 构建 GBBQ 索引
-	xdxrIndex, err := buildXdxrIndex(db)
-
-	if err != nil {
-		return fmt.Errorf("failed to build GBBQ index: %w", err)
-	}
-
-	symbols, err := db.GetAllSymbols()
-	if err != nil {
-		return fmt.Errorf("failed to query all stock symbols: %w", err)
-	}
-
-	// 定义结果通道
-	type result struct {
-		rows string
-		err  error
-	}
-	results := make(chan result, len(symbols))
-	var wg sync.WaitGroup
-	sem := make(chan struct{}, maxConcurrency)
-
-	// 启动写入协程
-	var writerWg sync.WaitGroup
-	writerWg.Go(func() {
-		for res := range results {
-			if res.err != nil {
-				fmt.Printf("错误：%v\n", res.err)
-				continue
-			}
-			if _, err := outFile.WriteString(res.rows); err != nil {
-				fmt.Printf("写入 CSV 失败：%v\n", err)
-			}
-		}
-	})
-
-	// 并发处理每个符号
-	for _, symbol := range symbols {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func(sym string) {
-			defer wg.Done()
-			defer func() { <-sem }()
-			stockData, err := db.QueryStockData(sym, nil, nil)
-			if err != nil {
-				results <- result{"", fmt.Errorf("failed to query stock data for symbol %s: %w", sym, err)}
-				return
-			}
-			xdxrData := getXdxrByCode(xdxrIndex, sym)
-
-			factors, err := calc.CalculateFqFactor(stockData, xdxrData)
-			if err != nil {
-				results <- result{"", fmt.Errorf("failed to calculate factor for symbol %s: %w", sym, err)}
-				return
-			}
-			// 将因子格式化为 CSV 行
-			var sb strings.Builder
-			for _, factor := range factors {
-				row := fmt.Sprintf("%s,%s,%.4f,%.4f,%.4f,%.4f\n",
-					factor.Symbol,
-					factor.Date.Format("2006-01-02"),
-					factor.Close,
-					factor.PreClose,
-					factor.QfqFactor,
-					factor.HfqFactor,
-				)
-				sb.WriteString(row)
-			}
-			results <- result{sb.String(), nil}
-		}(symbol)
-	}
-
-	// 等待所有处理n完成并关闭结果通道
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	// 等待写入协程完成
-	writerWg.Wait()
-
-	if err := db.ImportAdjustFactors(csvPath); err != nil {
+	calc.ExportFactorsToParquet(db, parquetPath)
+	if err := db.ImportAdjustFactors(parquetPath); err != nil {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 	fmt.Println("🔢 复权因子导入成功")
 
 	return nil
-}
-
-func buildXdxrIndex(db database.DataRepository) (XdxrIndex, error) {
-	index := make(XdxrIndex)
-
-	xdxrData, err := db.QueryAllXdxr()
-	if err != nil {
-		return nil, fmt.Errorf("failed to query xdxr data: %w", err)
-	}
-
-	for _, data := range xdxrData {
-		code := data.Code
-		index[code] = append(index[code], data)
-	}
-
-	return index, nil
-}
-
-func getXdxrByCode(index XdxrIndex, symbol string) []model.XdxrData {
-	code := symbol[2:]
-	if data, exists := index[code]; exists {
-		return data
-	}
-	return []model.XdxrData{}
 }
 
 func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) {
@@ -410,18 +300,18 @@ func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 		endDate := validDates[len(validDates)-1]
 		switch dataType {
 		case "day":
-			if err := tdx.DatatoolCreate(DataDir, "day", endDate); err != nil {
+			if err := tdx.DatatoolCreate(TempDir, "day", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolDayCreate: %w", err)
 			}
 
 		case "tic":
 			endDate := validDates[len(validDates)-1]
 			fmt.Printf("🐢 开始转档分笔数据\n")
-			if err := tdx.DatatoolCreate(DataDir, "tick", endDate); err != nil {
+			if err := tdx.DatatoolCreate(TempDir, "tick", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 			}
 			fmt.Printf("🐢 开始转换分钟数据\n")
-			if err := tdx.DatatoolCreate(DataDir, "min", endDate); err != nil {
+			if err := tdx.DatatoolCreate(TempDir, "min", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolMinCreate: %w", err)
 			}
 		}

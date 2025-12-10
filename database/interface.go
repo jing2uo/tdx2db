@@ -12,11 +12,11 @@ type DataRepository interface {
 
 	InitSchema() error
 
-	ImportDailyStocks(csvPath string) error
-	Import1MinStocks(csvPath string) error
-	Import5MinStocks(csvPath string) error
-	ImportAdjustFactors(csvPath string) error
-	ImportGBBQ(csvPath string) error
+	ImportDailyStocks(parquetPath string) error
+	Import1MinStocks(parquetPath string) error
+	Import5MinStocks(parquetPath string) error
+	ImportAdjustFactors(parquetPath string) error
+	ImportGBBQ(parquetPath string) error
 
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)
 	Query(table string, conditions map[string]interface{}, dest interface{}) error

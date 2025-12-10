@@ -1,294 +1,318 @@
 package tdx
 
 import (
-	"bytes"
 	"encoding/binary"
 	"fmt"
-	"io"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/jing2uo/tdx2db/model"
+	"github.com/parquet-go/parquet-go"
 )
+
+// Constants & Configuration
 
 var maxConcurrency = runtime.NumCPU()
 
-type rowData struct {
-	Line string
+const (
+	recordSize = 32 // TDX 记录固定字节大小
+)
+
+// batchData 泛型容器，用于在 Channel 中传递解析好的数据块
+type batchData[T any] struct {
+	Rows []T
 	Err  error
 }
 
-type dayfileRecord struct {
-	Date   uint32
-	Open   uint32
-	High   uint32
-	Low    uint32
-	Close  uint32
-	Amount float32
-	Volume uint32
-}
+// Main Entry Point
 
-type minfileRecord struct {
-	DateRaw uint16
-	TimeRaw uint16
-	Open    uint32
-	High    uint32
-	Low     uint32
-	Close   uint32
-	Amount  float32
-	Volume  uint32
-}
-
-const (
-	// 定义写入CSV时批处理的大小，累积到这个数量再一次性写入文件
-	writeBatchSize = 16284
-	// 定义从源文件中一次读取的缓冲区大小 (例如 1MB)
-	readBufferSize = 1024 * 1024
-	// 每条记录的固定大小（字节）
-	recordSize = 32
-)
-
-// 将通达信的 .day, .01, 或 .5 文件转换为CSV文件。
-func ConvertFiles2Csv(filePath string, validPrefixes []string, outputCSV string, suffix string) (string, error) {
-	// 1. 根据文件后缀选择CSV头部和记录处理器
-	var csvHeader string
-	var recordProcessor func(recordBytes []byte, symbol string) (string, error)
-
+// ConvertFilesToParquet 自动根据后缀选择类型进行转换
+func ConvertFilesToParquet(inputDir string, validPrefixes []string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
-		csvHeader = "symbol,open,high,low,close,amount,volume,date\n"
-		recordProcessor = processDayRecord
+		// 使用泛型函数处理 StockData
+		return runConversion[model.StockData](inputDir, validPrefixes, outputFile, suffix, processDayFile)
 	case ".01", ".5":
-		csvHeader = "symbol,open,high,low,close,amount,volume,datetime\n"
-		recordProcessor = processMinRecord
+		// 使用泛型函数处理 StockMinData
+		return runConversion[model.StockMinData](inputDir, validPrefixes, outputFile, suffix, processMinFile)
 	default:
-		return "", fmt.Errorf("unsupported file suffix: '%s'. Supported are .day, .01, .5", suffix)
+		return "", fmt.Errorf("unsupported suffix: %s", suffix)
 	}
+}
 
-	// 2. 收集所有匹配的文件
-	files, err := collectFiles(filePath, validPrefixes, suffix)
+// Generic Conversion Engine
+
+func runConversion[T any](
+	inputDir string,
+	validPrefixes []string,
+	outputFile string,
+	suffix string,
+	parser func([]byte, string) ([]T, error),
+) (string, error) {
+
+	// 1. 收集文件
+	files, err := collectFiles(inputDir, validPrefixes, suffix)
 	if err != nil {
 		return "", err
 	}
 
-	// 3. 创建CSV文件并写入头部
-	outFile, err := os.Create(outputCSV)
+	// 2. 创建输出文件
+	f, err := os.Create(outputFile)
 	if err != nil {
-		return "", fmt.Errorf("failed to create CSV file %s: %w", outputCSV, err)
+		return "", fmt.Errorf("create file error: %w", err)
 	}
-	defer outFile.Close()
+	defer f.Close()
 
-	if _, err := outFile.WriteString(csvHeader); err != nil {
-		return "", fmt.Errorf("failed to write CSV header: %w", err)
+	// 3. 初始化 Parquet Generic Writer
+	writerConfig := []parquet.WriterOption{
+		// 使用 Snappy 压缩 (速度与压缩率平衡)
+		parquet.Compression(&parquet.Snappy),
+
+		// WriteBufferSize 相当于 RowGroup Size。
+		// 设置为 48MB (通常 16MB-128MB 之间较好)，缓冲区满后会刷新为一个 RowGroup。
+		// 大的 RowGroup 有利于压缩，但占用更多内存。
+		parquet.WriteBufferSize(48 * 1024 * 1024),
+
+		// PageBufferSize 是列数据页的目标大小。
+		// 设置为 64KB，这是 Parquet 的推荐值，利于读取时的粒度控制。
+		parquet.PageBufferSize(64 * 1024),
 	}
 
-	// 4. 设置生产者-消费者模型
-	rowChan := make(chan rowData, 1024)
+	// 创建泛型 Writer
+	pw := parquet.NewGenericWriter[T](f, writerConfig...)
+
+	// 4. 并发管道设置
+	batchChan := make(chan batchData[T], maxConcurrency*2)
 	var producerWg sync.WaitGroup
 	var consumerWg sync.WaitGroup
-	sem := make(chan struct{}, maxConcurrency)
+	sem := make(chan struct{}, maxConcurrency) // 信号量控制读取并发度
 
+	// 错误收集
 	var errors []string
-	var errorMutex sync.Mutex
-	collectError := func(err error) {
-		errorMutex.Lock()
-		errors = append(errors, err.Error())
-		errorMutex.Unlock()
+	var errMu sync.Mutex
+	collectError := func(e error) {
+		errMu.Lock()
+		errors = append(errors, e.Error())
+		errMu.Unlock()
 	}
 
-	// 消费者：批量写入文件
+	// Consumer: 写入 Parquet
 	consumerWg.Go(func() {
-		batch := make([]string, 0, writeBatchSize)
-
-		for data := range rowChan {
-			if data.Err != nil {
-				collectError(data.Err)
+		defer pw.Close() // 确保数据落盘
+		for batch := range batchChan {
+			if batch.Err != nil {
+				collectError(batch.Err)
 				continue
 			}
-			batch = append(batch, data.Line)
-			if len(batch) >= writeBatchSize {
-				if err := writeBatchToFile(outFile, batch); err != nil {
-					collectError(err)
+			if len(batch.Rows) > 0 {
+				if _, err := pw.Write(batch.Rows); err != nil {
+					collectError(fmt.Errorf("parquet write error: %w", err))
 				}
-				batch = batch[:0]
-			}
-		}
-
-		if len(batch) > 0 {
-			if err := writeBatchToFile(outFile, batch); err != nil {
-				collectError(err)
 			}
 		}
 	})
 
-	// 生产者：bounded concurrency
+	// Producer: 读取并解析文件
 	for _, file := range files {
-		file := file // 避免循环变量捕获
+		file := file
 		producerWg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 
-			processAndProduce(file, suffix, rowChan, recordProcessor)
+			rows, err := readFileAndParse(file, suffix, parser)
+			batchChan <- batchData[T]{Rows: rows, Err: err}
 		})
 	}
 
 	producerWg.Wait()
-	close(rowChan)
+	close(batchChan)
 	consumerWg.Wait()
 
 	if len(errors) > 0 {
-		return outputCSV, fmt.Errorf("errors occurred during processing:\n%s", strings.Join(errors, "\n"))
+		return outputFile, fmt.Errorf("occurred %d errors, first: %s", len(errors), errors[0])
 	}
-
-	return outputCSV, nil
+	return outputFile, nil
 }
 
-// collectFiles 遍历目录并收集所有符合条件的文件路径。
-func collectFiles(filePath string, validPrefixes []string, suffix string) ([]string, error) {
-	var files []string
-	err := filepath.WalkDir(filePath, func(path string, d os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if !d.IsDir() && strings.HasSuffix(path, suffix) {
-			symbol := strings.TrimSuffix(filepath.Base(path), suffix)
-			for _, prefix := range validPrefixes {
-				if strings.HasPrefix(symbol, prefix) {
-					files = append(files, path)
-					return nil
-				}
-			}
-		}
-		return nil
-	})
+// readFileAndParse 读取文件并解析
+func readFileAndParse[T any](filename, suffix string, parser func([]byte, string) ([]T, error)) ([]T, error) {
+	// TDX 单个文件通常很小，直接 ReadFile 读入内存是最快的，避免了 bufio 的开销
+	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to traverse directory %s: %w", filePath, err)
+		return nil, fmt.Errorf("read %s: %w", filename, err)
 	}
-	if len(files) == 0 {
-		return nil, fmt.Errorf("no valid '%s' files found with the given prefixes", suffix)
+	if len(data) == 0 {
+		return nil, nil
 	}
-	return files, nil
-}
-
-// processAndProduce 读取单个文件，使用指定的处理器函数解析记录，并将结果发送到channel。
-func processAndProduce(filename, suffix string, rowChan chan<- rowData, processor func([]byte, string) (string, error)) {
-	fileInfo, err := os.Stat(filename)
-	if err != nil {
-		rowChan <- rowData{Err: fmt.Errorf("could not stat file %s: %w", filename, err)}
-		return
-	}
-	if fileInfo.Size() == 0 {
-		return // 静默跳过空文件
-	}
-
-	inFile, err := os.Open(filename)
-	if err != nil {
-		rowChan <- rowData{Err: fmt.Errorf("failed to open file %s: %w", filename, err)}
-		return
-	}
-	defer inFile.Close()
 
 	symbol := strings.TrimSuffix(filepath.Base(filename), suffix)
-	buffer := make([]byte, readBufferSize)
+	return parser(data, symbol)
+}
 
-	for {
-		n, err := inFile.Read(buffer)
-		if err == io.EOF {
-			break
-		}
+// Parsers (Performance Critical)
+
+// processDayFile 解析日线数据 (.day)
+func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
+	n := len(data)
+	if n%recordSize != 0 {
+		return nil, fmt.Errorf("invalid file size: %d", n)
+	}
+	count := n / recordSize
+	rows := make([]model.StockData, 0, count) // 预分配内存
+
+	var offset int
+	for i := 0; i < count; i++ {
+		offset = i * recordSize
+
+		// 格式布局 (32字节):
+		// 00-03: Date (uint32 YYYYMMDD)
+		// 04-07: Open (uint32 / 100)
+		// 08-11: High (uint32 / 100)
+		// 12-15: Low  (uint32 / 100)
+		// 16-19: Close (uint32 / 100)
+		// 20-23: Amount (float32)
+		// 24-27: Volume (uint32)
+		// 28-31: Reserved
+
+		dateRaw := binary.LittleEndian.Uint32(data[offset : offset+4])
+		openRaw := binary.LittleEndian.Uint32(data[offset+4 : offset+8])
+		highRaw := binary.LittleEndian.Uint32(data[offset+8 : offset+12])
+		lowRaw := binary.LittleEndian.Uint32(data[offset+12 : offset+16])
+		closeRaw := binary.LittleEndian.Uint32(data[offset+16 : offset+20])
+
+		// Amount 是 float32，需要 bits 转换
+		amountBits := binary.LittleEndian.Uint32(data[offset+20 : offset+24])
+		amount := math.Float32frombits(amountBits)
+
+		volRaw := binary.LittleEndian.Uint32(data[offset+24 : offset+28])
+
+		t, err := parseDate(dateRaw)
 		if err != nil {
-			rowChan <- rowData{Err: fmt.Errorf("failed to read file %s: %w", filename, err)}
-			return
-		}
-		if n%recordSize != 0 {
-			rowChan <- rowData{Err: fmt.Errorf("invalid file format in %s: data length %d is not a multiple of %d", filename, n, recordSize)}
-			return
+			continue // 忽略错误行
 		}
 
-		for i := 0; i < n/recordSize; i++ {
-			recordBytes := buffer[i*recordSize : (i+1)*recordSize]
-			csvLine, err := processor(recordBytes, symbol)
-			if err != nil {
-				// 发送错误，但继续处理文件中的其他记录
-				rowChan <- rowData{Err: fmt.Errorf("failed to process record in %s: %w", filename, err)}
-				continue
-			}
-			rowChan <- rowData{Line: csvLine}
+		rows = append(rows, model.StockData{
+			Symbol: symbol,
+			Open:   float64(openRaw) / 100.0,
+			High:   float64(highRaw) / 100.0,
+			Low:    float64(lowRaw) / 100.0,
+			Close:  float64(closeRaw) / 100.0,
+			Amount: float64(amount),
+			Volume: int64(volRaw),
+			Date:   t,
+		})
+	}
+	return rows, nil
+}
+
+// processMinFile 解析分钟数据 (.01 / .5)
+func processMinFile(data []byte, symbol string) ([]model.StockMinData, error) {
+	n := len(data)
+	if n%recordSize != 0 {
+		return nil, fmt.Errorf("invalid file size: %d", n)
+	}
+	count := n / recordSize
+	rows := make([]model.StockMinData, 0, count)
+
+	var offset int
+	for i := 0; i < count; i++ {
+		offset = i * recordSize
+
+		// 格式布局 (32字节):
+		// 00-01: Date (uint16 compressed)
+		// 02-03: Time (uint16 compressed)
+		// 04-07: Open ...
+
+		dateRaw := binary.LittleEndian.Uint16(data[offset : offset+2])
+		timeRaw := binary.LittleEndian.Uint16(data[offset+2 : offset+4])
+		openRaw := binary.LittleEndian.Uint32(data[offset+4 : offset+8])
+		highRaw := binary.LittleEndian.Uint32(data[offset+8 : offset+12])
+		lowRaw := binary.LittleEndian.Uint32(data[offset+12 : offset+16])
+		closeRaw := binary.LittleEndian.Uint32(data[offset+16 : offset+20])
+
+		amountBits := binary.LittleEndian.Uint32(data[offset+20 : offset+24])
+		amount := math.Float32frombits(amountBits)
+
+		volRaw := binary.LittleEndian.Uint32(data[offset+24 : offset+28])
+
+		t, err := parseDateTime(dateRaw, timeRaw)
+		if err != nil {
+			continue
 		}
+
+		rows = append(rows, model.StockMinData{
+			Symbol:   symbol,
+			Open:     float64(openRaw) / 100.0,
+			High:     float64(highRaw) / 100.0,
+			Low:      float64(lowRaw) / 100.0,
+			Close:    float64(closeRaw) / 100.0,
+			Amount:   float64(amount),
+			Volume:   int64(volRaw),
+			Datetime: t,
+		})
 	}
+	return rows, nil
 }
 
-// writeBatchToFile 将一批字符串高效地写入文件。
-func writeBatchToFile(file *os.File, batch []string) error {
-	if _, err := file.WriteString(strings.Join(batch, "")); err != nil {
-		return fmt.Errorf("failed to write batch to %s: %v", file.Name(), err)
+// Helpers
+
+func parseDate(d uint32) (time.Time, error) {
+	year := int(d / 10000)
+	month := int((d % 10000) / 100)
+	day := int(d % 100)
+	// 基本校验
+	if year < 1900 || month < 1 || month > 12 || day < 1 || day > 31 {
+		return time.Time{}, fmt.Errorf("invalid date")
 	}
-	return nil
+	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local), nil
 }
 
-// --- 特定记录处理函数 ---
-
-func processDayRecord(data []byte, symbol string) (string, error) {
-	var record dayfileRecord
-	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &record); err != nil {
-		return "", fmt.Errorf("binary read failed: %w", err)
-	}
-	dateStr, err := formatDate(record.Date)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%s\n",
-		symbol,
-		float64(record.Open)/100,
-		float64(record.High)/100,
-		float64(record.Low)/100,
-		float64(record.Close)/100,
-		record.Amount,
-		record.Volume,
-		dateStr), nil
-}
-
-func processMinRecord(data []byte, symbol string) (string, error) {
-	var record minfileRecord
-	if err := binary.Read(bytes.NewReader(data), binary.LittleEndian, &record); err != nil {
-		return "", fmt.Errorf("binary read failed: %w", err)
-	}
-	dateTimeStr, err := formatDateTime(record.DateRaw, record.TimeRaw)
-	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%s,%.2f,%.2f,%.2f,%.2f,%.2f,%d,%s\n",
-		symbol,
-		float64(record.Open)/100,
-		float64(record.High)/100,
-		float64(record.Low)/100,
-		float64(record.Close)/100,
-		record.Amount,
-		record.Volume,
-		dateTimeStr), nil
-}
-
-func formatDate(date uint32) (string, error) {
-	d := int(date)
-	year, month, day := d/10000, (d%10000)/100, d%100
-	if year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 {
-		return "", fmt.Errorf("invalid date value: %08d", date)
-	}
-	return fmt.Sprintf("%04d-%02d-%02d", year, month, day), nil
-}
-
-func formatDateTime(dateRaw, timeRaw uint16) (string, error) {
+func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
+	// 通达信分钟线时间压缩算法
 	year := int(dateRaw)/2048 + 2004
 	month := (int(dateRaw) % 2048) / 100
 	day := (int(dateRaw) % 2048) % 100
 	hour := int(timeRaw) / 60
 	minute := int(timeRaw) % 60
-	if year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31 {
-		return "", fmt.Errorf("invalid date value from raw: %d", dateRaw)
+
+	if month < 1 || month > 12 || day < 1 || day > 31 {
+		return time.Time{}, fmt.Errorf("invalid date")
 	}
-	if hour < 0 || hour > 23 || minute < 0 || minute > 59 {
-		return "", fmt.Errorf("invalid time value from raw: %d", timeRaw)
-	}
-	return fmt.Sprintf("%04d-%02d-%02d %02d:%02d", year, month, day, hour, minute), nil
+	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.Local), nil
+}
+
+func collectFiles(root string, prefixes []string, suffix string) ([]string, error) {
+	var files []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() && strings.HasSuffix(path, suffix) {
+			fname := filepath.Base(path)
+			symbol := strings.TrimSuffix(fname, suffix)
+
+			match := false
+			if len(prefixes) == 0 {
+				match = true
+			} else {
+				for _, p := range prefixes {
+					if strings.HasPrefix(symbol, p) {
+						match = true
+						break
+					}
+				}
+			}
+
+			if match {
+				files = append(files, path)
+			}
+		}
+		return nil
+	})
+	return files, err
 }

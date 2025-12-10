@@ -109,66 +109,55 @@ func SchemaFromStruct(tableName string, model interface{}, orderByKey []string) 
 }
 
 // --- 结构体定义 (Schema) ---
-
 type StockData struct {
-	Symbol string    `col:"symbol"`
-	Open   float64   `col:"open"`
-	High   float64   `col:"high"`
-	Low    float64   `col:"low"`
-	Close  float64   `col:"close"`
-	Amount float64   `col:"amount"`
-	Volume int64     `col:"volume"`
-	Date   time.Time `col:"date" type:"date"`
+	Symbol string    `col:"symbol" parquet:"symbol,dict"`
+	Open   float64   `col:"open"   parquet:"open"`
+	High   float64   `col:"high"   parquet:"high"`
+	Low    float64   `col:"low"    parquet:"low"`
+	Close  float64   `col:"close"  parquet:"close"`
+	Amount float64   `col:"amount" parquet:"amount"`
+	Volume int64     `col:"volume" parquet:"volume"`
+	Date   time.Time `col:"date"   parquet:"date"      type:"date"`
 }
 
 type StockMinData struct {
-	Symbol   string    `col:"symbol"`
-	Open     float64   `col:"open"`
-	High     float64   `col:"high"`
-	Low      float64   `col:"low"`
-	Close    float64   `col:"close"`
-	Amount   float64   `col:"amount"`
-	Volume   int64     `col:"volume"`
-	Datetime time.Time `col:"datetime" type:"datetime"`
+	Symbol   string    `col:"symbol"   parquet:"symbol,dict"`
+	Open     float64   `col:"open"     parquet:"open"`
+	High     float64   `col:"high"     parquet:"high"`
+	Low      float64   `col:"low"      parquet:"low"`
+	Close    float64   `col:"close"    parquet:"close"`
+	Amount   float64   `col:"amount"   parquet:"amount"`
+	Volume   int64     `col:"volume"   parquet:"volume"`
+	Datetime time.Time `col:"datetime" parquet:"datetime"    type:"datetime" `
 }
 
 type Factor struct {
-	Symbol    string    `col:"symbol"`
-	Date      time.Time `col:"date" type:"date"`
-	Close     float64   `col:"close"`
-	PreClose  float64   `col:"pre_close"`
-	QfqFactor float64   `col:"qfq_factor"`
-	HfqFactor float64   `col:"hfq_factor"`
+	Symbol    string    `col:"symbol"      parquet:"symbol,dict"`
+	Date      time.Time `col:"date"        parquet:"date"         type:"date"`
+	Close     float64   `col:"close"       parquet:"close"`
+	PreClose  float64   `col:"pre_close"   parquet:"pre_close"`
+	QfqFactor float64   `col:"qfq_factor"  parquet:"qfq_factor"`
+	HfqFactor float64   `col:"hfq_factor"  parquet:"hfq_factor"`
 }
 
 type GbbqData struct {
-	Category int       `col:"category"`
-	Code     string    `col:"code"`
-	Date     time.Time `col:"date" type:"date"`
-	C1       float64   `col:"c1"`
-	C2       float64   `col:"c2"`
-	C3       float64   `col:"c3"`
-	C4       float64   `col:"c4"`
+	Category int       `col:"category" parquet:"category"`
+	Code     string    `col:"code"     parquet:"code,dict"`
+	Date     time.Time `col:"date"     parquet:"date"    type:"date"`
+	C1       float64   `col:"c1"       parquet:"c1"`
+	C2       float64   `col:"c2"       parquet:"c2"`
+	C3       float64   `col:"c3"       parquet:"c3"`
+	C4       float64   `col:"c4"       parquet:"c4"`
 }
 
 type XdxrData struct {
 	Code        string    `col:"code"`
-	Date        time.Time `col:"date" type:"date"`
+	Date        time.Time `col:"date"         type:"date"`
 	Fenhong     float64   `col:"fenhong"`
 	Peigujia    float64   `col:"peigujia"`
 	Songzhuangu float64   `col:"songzhuangu"`
 	Peigu       float64   `col:"peigu"`
 }
-
-//
-//type CapitalData struct {
-//	Code            string    `col:"code"`
-//	Date            time.Time `col:"date" type:"date"`
-//	PrevOutstanding float64   `col:"prev_outstanding"`
-//	PrevTotal       float64   `col:"prev_total"`
-//	Outstanding     float64   `col:"outstanding"`
-//	Total           float64   `col:"total"`
-//}
 
 // --- 表结构元数据 (TableMeta) ---
 

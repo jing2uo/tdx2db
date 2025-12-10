@@ -41,7 +41,6 @@ func Init(dbPath, dayFileDir string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// 4. 处理文件：TDX Binary -> CSV
 	fmt.Printf("📦 开始处理日线目录: %s\n", dayFileDir)
 	err = utils.CheckDirectory(dayFileDir)
 	if err != nil {
@@ -49,14 +48,14 @@ func Init(dbPath, dayFileDir string) error {
 	}
 
 	fmt.Println("🐢 开始转换日线数据")
-	generatedCsvPath, err := tdx.ConvertFiles2Csv(dayFileDir, ValidPrefixes, StockCSV, ".day")
+	_, err = tdx.ConvertFilesToParquet(dayFileDir, ValidPrefixes, StockDailyParquet, ".day")
 	if err != nil {
-		return fmt.Errorf("failed to convert day files to CSV: %w", err)
+		return fmt.Errorf("failed to convert day files to parquet: %w", err)
 	}
 	fmt.Println("🔥 转换完成")
 
-	if err := db.ImportDailyStocks(generatedCsvPath); err != nil {
-		return fmt.Errorf("failed to import stock CSV: %w", err)
+	if err := db.ImportDailyStocks(StockDailyParquet); err != nil {
+		return fmt.Errorf("failed to import stock parquet: %w", err)
 	}
 
 	fmt.Println("🚀 股票数据导入成功")
