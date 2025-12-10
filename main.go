@@ -65,7 +65,7 @@ func main() {
 
 	var convertCmd = &cobra.Command{
 		Use:   "convert",
-		Short: "Convert TDX data to CSV",
+		Short: "Convert TDX data to parquet",
 		PreRunE: func(c *cobra.Command, args []string) error {
 			setFlags := 0
 			if c.Flags().Changed("dayfiledir") {
@@ -142,7 +142,7 @@ func main() {
 	convertCmd.Flags().StringVar(&ticZipFile, "ticzip", "", "通达信四代 TIC 压缩文件")
 	convertCmd.Flags().StringVar(&dayZipFile, "dayzip", "", "通达信四代行情压缩文件")
 	convertCmd.Flags().StringVar(&gbbqZipFile, "gbbqzip", "", "通达信股本变迁压缩文件")
-	convertCmd.Flags().StringVar(&outPutFile, "output", "", "CSV 文件输出目录")
+	convertCmd.Flags().StringVar(&outPutFile, "output", "", "parquet 文件输出目录")
 	convertCmd.MarkFlagRequired("output")
 
 	rootCmd.AddCommand(initCmd)
@@ -150,7 +150,7 @@ func main() {
 	rootCmd.AddCommand(convertCmd)
 
 	cobra.OnFinalize(func() {
-		os.RemoveAll(cmd.DataDir)
+		os.RemoveAll(cmd.TempDir)
 	})
 
 	if err := rootCmd.Execute(); err != nil {

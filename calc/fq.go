@@ -1,9 +1,16 @@
 package calc
 
 import (
+	"fmt"
+	"os"
+	"runtime"
 	"sort"
+	"sync"
 	"time"
 
+	"github.com/parquet-go/parquet-go"
+
+	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
 )
 
@@ -18,6 +25,153 @@ type internalCombinedData struct {
 	Peigu       float64
 	Peigujia    float64
 	Songzhuangu float64
+}
+
+// factorBatch 用于在 Channel 中传递处理结果
+type factorBatch struct {
+	Rows []model.Factor
+	Err  error
+}
+
+var maxConcurrency = runtime.NumCPU()
+
+// UpdateFactors 计算复权因子并导出为 Parquet
+func ExportFactorsToParquet(db database.DataRepository, parquetPath string) error {
+
+	// 1. 构建 XDXR 索引 (除权除息数据)
+	xdxrIndex, err := buildXdxrIndex(db)
+	if err != nil {
+		return fmt.Errorf("failed to build XDXR index: %w", err)
+	}
+
+	// 2. 获取所有股票代码
+	symbols, err := db.GetAllSymbols()
+	if err != nil {
+		return fmt.Errorf("failed to query all stock symbols: %w", err)
+	}
+
+	// 3. 创建 Parquet 文件 writer
+	f, err := os.Create(parquetPath)
+	if err != nil {
+		return fmt.Errorf("failed to create parquet file %s: %w", parquetPath, err)
+	}
+	defer f.Close()
+
+	// 配置 Parquet Writer
+	writerConfig := []parquet.WriterOption{
+		parquet.Compression(&parquet.Snappy),
+		parquet.WriteBufferSize(48 * 1024 * 1024), // 48MB RowGroup Buffer
+		parquet.PageBufferSize(64 * 1024),         // 64KB Page Buffer
+	}
+
+	pw := parquet.NewGenericWriter[model.Factor](f, writerConfig...)
+	defer pw.Close() // 确保数据刷入磁盘
+
+	// 4. 并发处理管道
+	batchChan := make(chan factorBatch, maxConcurrency*4)
+	var wg sync.WaitGroup
+	var writerWg sync.WaitGroup
+	sem := make(chan struct{}, maxConcurrency) // 限制并发读取/计算的数量
+
+	// --- Consumer: 单协程写入 Parquet ---
+	writerWg.Add(1)
+	go func() {
+		defer writerWg.Done()
+		for batch := range batchChan {
+			if batch.Err != nil {
+				fmt.Printf("计算错误: %v\n", batch.Err)
+				continue
+			}
+			if len(batch.Rows) > 0 {
+				if _, err := pw.Write(batch.Rows); err != nil {
+					fmt.Printf("Parquet 写入失败: %v\n", err)
+				}
+			}
+		}
+	}()
+
+	// --- Producer: 并发计算 ---
+	for _, symbol := range symbols {
+		wg.Add(1)
+		sem <- struct{}{} // 获取令牌
+
+		go func(sym string) {
+			defer wg.Done()
+			defer func() { <-sem }() // 释放令牌
+
+			// 查询个股行情数据
+			stockData, err := db.QueryStockData(sym, nil, nil)
+			if err != nil {
+				batchChan <- factorBatch{Err: fmt.Errorf("symbol %s query failed: %w", sym, err)}
+				return
+			}
+
+			// 获取除权数据
+			xdxrData := getXdxrByCode(xdxrIndex, sym)
+
+			// 计算因子 (假设返回的是 []model.Factor 或类似的结构切片)
+			factors, err := CalculateFqFactor(stockData, xdxrData)
+			if err != nil {
+				batchChan <- factorBatch{Err: fmt.Errorf("symbol %s calc failed: %w", sym, err)}
+				return
+			}
+
+			// 转换数据格式 (Model -> Parquet Struct)
+			// 预分配内存，避免 append 扩容开销
+			parquetRows := make([]model.Factor, len(factors))
+			for i, factor := range factors {
+				parquetRows[i] = model.Factor{
+					Symbol:    factor.Symbol,
+					Date:      factor.Date,
+					Close:     factor.Close,
+					PreClose:  factor.PreClose,
+					QfqFactor: factor.QfqFactor,
+					HfqFactor: factor.HfqFactor,
+				}
+			}
+
+			// 发送整个切片到 Channel
+			batchChan <- factorBatch{Rows: parquetRows}
+		}(symbol)
+	}
+
+	// 等待所有计算任务完成
+	wg.Wait()
+	close(batchChan) // 关闭通道，通知 Writer 结束
+	writerWg.Wait()  // 等待写入完成
+	return nil
+}
+
+// --- 辅助函数 (保持逻辑不变，仅作类型适配) ---
+
+type XdxrIndex map[string][]model.XdxrData
+
+func buildXdxrIndex(db database.DataRepository) (XdxrIndex, error) {
+	index := make(XdxrIndex)
+
+	xdxrData, err := db.QueryAllXdxr()
+	if err != nil {
+		return nil, fmt.Errorf("failed to query xdxr data: %w", err)
+	}
+
+	for _, data := range xdxrData {
+		code := data.Code
+		index[code] = append(index[code], data)
+	}
+
+	return index, nil
+}
+
+func getXdxrByCode(index XdxrIndex, symbol string) []model.XdxrData {
+	// 假设 symbol 格式为 "sh600000"，这里截取 "600000"
+	if len(symbol) <= 2 {
+		return []model.XdxrData{}
+	}
+	code := symbol[2:]
+	if data, exists := index[code]; exists {
+		return data
+	}
+	return []model.XdxrData{}
 }
 
 func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) ([]model.Factor, error) {

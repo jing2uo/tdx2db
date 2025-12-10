@@ -11,11 +11,11 @@ import (
 var maxConcurrency = runtime.NumCPU()
 var Today = time.Now().Truncate(24 * time.Hour)
 
-var DataDir, _ = utils.GetCacheDir()
-var VipdocDir = filepath.Join(DataDir, "vipdoc")
-var StockCSV = filepath.Join(DataDir, "stock.csv")
-var OneMinLineCSV = filepath.Join(DataDir, "1min.csv")
-var FiveMinLineCSV = filepath.Join(DataDir, "5min.csv")
+var TempDir, _ = utils.GetCacheDir()
+var VipdocDir = filepath.Join(TempDir, "vipdoc")
+var StockDailyParquet = filepath.Join(TempDir, "stock.parquet")
+var Stock1MinParquet = filepath.Join(TempDir, "1min.parquet")
+var Stock5MinParquet = filepath.Join(TempDir, "5min.parquet")
 
 var ValidPrefixes = []string{
 	"sz30",     // 创业板

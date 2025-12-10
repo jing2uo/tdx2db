@@ -153,9 +153,9 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 复权结果和 QUANTAXIS、通达信等比复权一致；其中前复权结果和雪球、新浪也一致。
 
-## 通达信数据转 CSV
+## 通达信数据转 parquet
 
-convert 命令支持转换通达信 .day .01 .5 文件、四代行情 zip、四代 TIC zip 到 csv，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
+convert 命令支持转换通达信 .day .01 .5 文件、四代行情 zip、四代 TIC zip 到 parquet，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
 
 ```shell
 tdx2db convert --output ./ --dayfiledir vipdoc       # 转换 .day 日线文件
