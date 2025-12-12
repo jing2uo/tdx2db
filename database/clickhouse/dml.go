@@ -1,6 +1,7 @@
 package clickhouse
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -32,7 +33,7 @@ func (d *ClickHouseDriver) importParquet(meta *model.TableMeta, filePath string)
 	}
 
 	q.Add("query", fmt.Sprintf("INSERT INTO %s FORMAT Parquet", meta.TableName))
-
+	q.Add("max_partitions_per_insert_block", "1000")
 	req.URL.RawQuery = q.Encode()
 
 	if d.authUser != "" {
@@ -55,6 +56,20 @@ func (d *ClickHouseDriver) importParquet(meta *model.TableMeta, filePath string)
 	return nil
 }
 
+func (d *ClickHouseDriver) truncateTable(meta *model.TableMeta) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	query := fmt.Sprintf("TRUNCATE TABLE IF EXISTS %s", meta.TableName)
+
+	_, err := d.db.ExecContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("clickhouse truncate via tcp failed: %w", err)
+	}
+
+	return nil
+}
+
 func (d *ClickHouseDriver) ImportDailyStocks(path string) error {
 	return d.importParquet(model.TableStocksDaily, path)
 }
@@ -68,10 +83,12 @@ func (d *ClickHouseDriver) Import5MinStocks(path string) error {
 }
 
 func (d *ClickHouseDriver) ImportGBBQ(path string) error {
+	d.truncateTable(model.TableGbbq)
 	return d.importParquet(model.TableGbbq, path)
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
+	d.truncateTable(model.TableAdjustFactor)
 	return d.importParquet(model.TableAdjustFactor, path)
 }
 

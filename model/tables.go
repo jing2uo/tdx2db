@@ -190,15 +190,3 @@ var TableGbbq = SchemaFromStruct(
 	GbbqData{},
 	[]string{"code", "date"},
 )
-
-//var TableXdxr = SchemaFromStruct(
-//	"raw_xdxr",
-//	XdxrData{},
-//	[]string{"code", "date"},
-//)
-//
-//var TableCapital = SchemaFromStruct(
-//	"raw_capital",
-//	CapitalData{},
-//	[]string{"code", "date"},
-//)

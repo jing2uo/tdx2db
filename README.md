@@ -1,4 +1,4 @@
-# tdx2db - 简单可靠的 A 股行情数据库
+# tdx2db - 获得你专属的 A 股行情数据库
 
 [![GitHub release](https://img.shields.io/github/v/release/jing2uo/tdx2db?style=flat-square)](https://github.com/jing2uo/tdx2db/releases)
 [![Docker Image](https://img.shields.io/badge/docker-pull-blue?style=flat-square&logo=docker)](https://github.com/jing2uo/tdx2db/pkgs/container/tdx2db)
@@ -18,14 +18,6 @@
 
 ## 安装说明
 
-### 使用 docker
-
-项目会利用 github action 构建容器镜像，windows 和 mac 可以通过 docker 使用:
-
-```bash
-docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
-```
-
 ### 使用二进制
 
 从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 x86 Linux 中**直接使用：
@@ -34,13 +26,21 @@ docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 ```
 
-## 导入到 DuckDB
+### 使用 docker
+
+项目会利用 github action 构建容器镜像，windows 和 mac 可以通过 docker 使用:
+
+```bash
+docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
+```
+
+## 导入到数据库
 
 ### 初始化
 
 首次使用需要全量导入历史数据，可以从 [通达信券商数据](https://www.tdx.com.cn/article/vipdata.html) 下载**沪深京日线数据完整包**。
 
-下载文件：
+下载文件:
 
 ```shell
 # linux mac
@@ -56,20 +56,20 @@ Invoke-WebRequest -Uri "https://data.tdx.com.cn/vipdoc/hsjday.zip" -OutFile "hsj
 Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
 ```
 
-二进制：
+二进制:
 
 ```shell
-  # 使用 DuckDB, dburi 格式： duckdb://[path]，path 支持相对路径
+  # 导入 DuckDB, dburi 格式： duckdb://[path]，path 支持相对路径
   tdx2db init --dburi 'duckdb://./tdx.db' --dayfiledir ./vipdoc
 
-  # 使用 ClickHouse, dburi 格式： clickhouse:[user[:password]@][host][:port][/database][?http_port=value1&param2=value2&...]
+  # 导入 ClickHouse, dburi 格式： clickhouse:[user[:password]@][host][:port][/database][?http_port=value1&param2=value2&...]
   tdx2db init --dburi 'clickhouse://default:123456@localhost:9000/mydb?http_port=8123' --dayfiledir ./vipdoc
 
   # ClickHouse 有以下默认值: user=default, password="", port=9000, http_port=8123, database=default，可以根据情况简写
   tdx2db init --dburi 'clickhouse://localhost' --dayfiledir ./vipdoc
 ```
 
-docker 或 podman：
+docker:
 
 ```shell
 # linux、mac docker
@@ -82,14 +82,13 @@ docker run --rm --platform=linux/amd64 -v "${PWD}:/data" \
   ghcr.io/jing2uo/tdx2db:latest \
   init --dayfiledir /data/vipdoc --dburi 'duckdb:///data/tdx.db'
 
-# 后续不再提示 docker 用法
-# 根据二进制示例修改第三行命令即可
+# 后续不再提示 docker 用法, 根据二进制示例修改第三行命令即可
 ```
 
-**必填参数**：
+**必填参数**:
 
-- `--dayfiledir`：通达信 .day 文件所在目录
-- `--dburi`：数据库连接信息
+- `--dayfiledir`: 通达信 .day 文件所在目录
+- `--dburi`: 数据库连接信息
 
 ### 增量更新
 
@@ -101,9 +100,9 @@ cron 命令会更新股票数据、股本变迁数据到最新日期，并计算
 tdx2db cron --dburi 'duckdb://tdx.db'    # ClickHouse schema 参考 init 部分
 ```
 
-**必填参数**：
+**必填参数**:
 
-- `--dburi`：数据库连接信息
+- `--dburi`: 数据库连接信息
 
 ### 分时数据
 
@@ -116,7 +115,7 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 
 **注意**
 
-1. 分时数据下载和导入比较耗时，数据量极大
+1. 分时数据下载和导入耗时，表数据量大
 2. 通达信没提供历史分时数据，请自行检索后使用 duckdb 导入
 3. 更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录

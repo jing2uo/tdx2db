@@ -53,7 +53,6 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 	}
 
 	// 2. 确定排序键 (MergeTree 必须)
-	// 通常是 (symbol, date) 以便快速查找某只股票的历史
 	orderBy := "tuple()"
 	if keyCol != "" && dateCol != "" {
 		orderBy = fmt.Sprintf("(%s, %s)", keyCol, dateCol)
@@ -98,95 +97,79 @@ func (d *ClickHouseDriver) registerViews() {
 	d.viewImpls[model.ViewTurnover] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
-			WITH base_capital AS (
+			WITH gbbq_sorted AS (
 				SELECT
-					date,
 					code,
+					date,
 					c3 AS float_shares,
 					c4 AS total_shares
 				FROM %s
 				WHERE category IN (2, 3, 5, 7, 8, 9, 10)
-			),
-			expanded AS (
-				SELECT
-					d.date,
-					d.symbol,
-					last_value(c.float_shares) IGNORE NULLS
-						OVER (PARTITION BY d.symbol ORDER BY d.date) AS float_shares,
-					last_value(c.total_shares) IGNORE NULLS
-						OVER (PARTITION BY d.symbol ORDER BY d.date) AS total_shares
-				FROM %s d
-				LEFT JOIN base_capital c
-					ON c.code = substring(d.symbol, 3)
-					AND c.date = d.date
+				ORDER BY code, date -- ASOF JOIN 必须排序
 			)
 			SELECT
 				r.date,
 				r.symbol,
-				CASE WHEN e.float_shares > 0 THEN
-					ROUND(r.volume / (e.float_shares * 10000), 6)
+				CASE WHEN g.float_shares > 0 THEN
+					ROUND(r.volume / (g.float_shares * 10000), 6)
 				ELSE 0 END AS turnover,
-				ROUND(e.float_shares * 10000 * r.close, 2) AS circ_mv,
-				ROUND(e.total_shares * 10000 * r.close, 2) AS total_mv
+				ROUND(g.float_shares * 10000 * r.close, 2) AS circ_mv,
+				ROUND(g.total_shares * 10000 * r.close, 2) AS total_mv
 			FROM %s r
-			JOIN expanded e ON r.symbol = e.symbol AND r.date = e.date
+			ASOF LEFT JOIN gbbq_sorted g
+				ON substring(r.symbol, 3) = g.code AND r.date >= g.date
 		`,
 			model.ViewTurnover,
 			model.TableGbbq.TableName,
-			model.TableStocksDaily.TableName,
 			model.TableStocksDaily.TableName)
 		_, err := d.db.Exec(query)
 		return err
 	}
 
+	// 通用创建复权视图函数
 	createAdjustView := func(viewName model.ViewID, sourceTable, factorCol string, isMin bool) error {
-		dateJoinCond := "s.date = f.date"
-		cols := "s.date"
+		// 默认日线逻辑
+		joinClause := fmt.Sprintf("LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date", model.TableAdjustFactor.TableName)
+		timeCol := "date"
 
+		// 分钟线逻辑
 		if isMin {
-			dateJoinCond = "toDate(s.datetime) = f.date"
-			cols = "s.datetime"
+			timeCol = "datetime"
+			joinClause = fmt.Sprintf(`
+				ASOF LEFT JOIN (
+					SELECT symbol, toDateTime(date) as dt_start, %s
+					FROM %s
+					ORDER BY symbol, dt_start
+				) f ON s.symbol = f.symbol AND s.datetime >= f.dt_start
+			`, factorCol, model.TableAdjustFactor.TableName)
 		}
 
+		// 组装 SQL
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
 			SELECT
 				s.symbol,
-				%s,
+				%s, -- date or datetime
 				s.volume,
 				s.amount,
 				ROUND(s.open  * f.%s, 2) AS open,
 				ROUND(s.high  * f.%s, 2) AS high,
 				ROUND(s.low   * f.%s, 2) AS low,
 				ROUND(s.close * f.%s, 2) AS close
-				%s
 			FROM %s s
-			JOIN %s f ON s.symbol = f.symbol AND %s
-			%s
+			%s -- Factor Join
 		`,
 			viewName,
-			cols,
+			timeCol,
 			factorCol, factorCol, factorCol, factorCol,
-			func() string {
-				if !isMin {
-					return ", t.turnover, t.circ_mv, t.total_mv"
-				}
-				return ""
-			}(),
 			sourceTable,
-			model.TableAdjustFactor.TableName,
-			dateJoinCond,
-			func() string {
-				if !isMin {
-					return fmt.Sprintf("LEFT JOIN %s t ON s.symbol = t.symbol AND s.date = t.date", model.ViewTurnover)
-				}
-				return ""
-			}(),
+			joinClause,
 		)
 		_, err := d.db.Exec(query)
 		return err
 	}
 
+	// 注册各个视图
 	d.viewImpls[model.ViewDailyQFQ] = func() error {
 		return createAdjustView(model.ViewDailyQFQ, model.TableStocksDaily.TableName, "qfq_factor", false)
 	}
