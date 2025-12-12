@@ -1,148 +1,130 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/jing2uo/tdx2db/cmd"
 	"github.com/spf13/cobra"
 )
 
-const dbPathInfo = "DuckDB 文件路径"
-const dayFileInfo = "通达信日线 .day 文件目录"
+const dbURIInfo = "数据库连接信息"
+const dbURIHelp = `
+
+Database URI:
+  ClickHouse: clickhouse//:[user[:password]@][host][:port][/database][?http_port=p&]
+  DuckDB:     duckdb://[path]`
+
+const dayFileInfo = "通达信日线文件目录"
 const minLineInfo = `导入分时数据（可选）
-  1    导入1分钟数据
-  5    导入5分钟数据
-  1,5  导入两种
-`
+  1    导入1分钟分时数据
+  5    导入5分钟分时数据
+  1,5  导入两种`
+
+const convertHelp = `
+
+Type & Input:
+  -t day   转换日线文件     -i 包含 .day 的目录
+  -t 1min  转换 1 分钟分时  -i 包含 .1 的目录
+  -t 5min  转换 5 分钟分时  -i 包含 .05 的目录
+  -t tic4  转换四代分笔     -i 四代 TIC 压缩文件
+  -t day4  转换四代日线     -i 四代行情压缩文件
+  -t gbbq  转换股本变迁     -i GBBQ 压缩文件`
 
 func main() {
-
 	var rootCmd = &cobra.Command{
 		Use:           "tdx2db",
 		Short:         "Load TDX Data to DuckDB",
 		SilenceErrors: true,
 	}
 
-	var dbPath, dayFileDir, minline string
 	var (
-		m1FileDir   string
-		m5FileDir   string
-		ticZipFile  string
-		gbbqZipFile string
-		dayZipFile  string
-		outPutFile  string
+		dbURI      string
+		dayFileDir string
+		minline    string
+
+		// Convert
+		inputType  string
+		inputPath  string
+		outputPath string
 	)
 
 	var initCmd = &cobra.Command{
 		Use:   "init",
 		Short: "Fully import stocks data from TDX",
+		Example: `  tdx2db init --dburi 'clickhouse://localhost' --dayfiledir /path/to/vipdoc/
+  tdx2db init --dburi 'duckdb://./tdx.db' --dayfiledir /path/to/vipdoc/` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			if err := cmd.Init(dbPath, dayFileDir); err != nil {
-				return err
-			}
-			return nil
+			return cmd.Init(dbURI, dayFileDir)
 		},
 	}
 
 	var cronCmd = &cobra.Command{
 		Use:   "cron",
 		Short: "Cron for update data and calc factor",
+		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --minline 1,5
+  tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
 			if c.Flags().Changed("minline") {
 				valid := map[string]bool{"1": true, "5": true, "1,5": true, "5,1": true}
 				if !valid[minline] {
-					return fmt.Errorf("--minline 允许 '1'、'5'、'1,5'、'5,1'（传入: %s）", minline)
+					return fmt.Errorf("--minline 仅支持 '1'、'5'、'1,5', 传入: %s", minline)
 				}
 			}
-			if err := cmd.Cron(dbPath, minline); err != nil {
-				return err
-			}
-			return nil
+			return cmd.Cron(dbURI, minline)
 		},
 	}
 
 	var convertCmd = &cobra.Command{
 		Use:   "convert",
 		Short: "Convert TDX data to parquet",
-		PreRunE: func(c *cobra.Command, args []string) error {
-			setFlags := 0
-			if c.Flags().Changed("dayfiledir") {
-				setFlags++
-			}
-			if c.Flags().Changed("ticzip") {
-				setFlags++
-			}
-			if c.Flags().Changed("dayzip") {
-				setFlags++
-			}
-			if c.Flags().Changed("gbbqzip") {
-				setFlags++
-			}
-			if c.Flags().Changed("m1filedir") {
-				setFlags++
-			}
-			if c.Flags().Changed("m5filedir") {
-				setFlags++
-			}
-
-			if setFlags == 0 {
-				return errors.New("必需 --dayfiledir, --m1filefir, --m5filedir 或 --ticzip,  --dayzip, --gbbqzip")
-			}
-			if setFlags > 1 {
-				return errors.New("--dayfiledir, --m1filedir, --m5filedir, --ticzip, --dayzip, --gbbqzip 不能一起使用")
-			}
-			return nil
-		},
+		Example: `  tdx2db convert -t day -i /path/to/vipdoc/ -o ./
+  tdx2db convert -t day4 -i /path/to/20251212.zip -o ./` + convertHelp,
 		RunE: func(c *cobra.Command, args []string) error {
 			opts := cmd.ConvertOptions{
-				OutputPath: outPutFile,
+				InputPath:  inputPath,
+				OutputPath: outputPath,
 			}
 
-			if c.Flags().Changed("dayfiledir") {
-				opts.InputPath = dayFileDir
+			switch strings.ToLower(inputType) {
+			case "day":
 				opts.InputType = cmd.DayFileDir
-			} else if c.Flags().Changed("m1filedir") {
-				opts.InputPath = m1FileDir
+			case "1min":
 				opts.InputType = cmd.Min1FileDir
-			} else if c.Flags().Changed("m5filedir") {
-				opts.InputPath = m5FileDir
+			case "5min":
 				opts.InputType = cmd.Min5FileDir
-			} else if c.Flags().Changed("ticzip") {
-				opts.InputPath = ticZipFile
+			case "tic4":
 				opts.InputType = cmd.TicZip
-			} else if c.Flags().Changed("gbbqzip") {
-				opts.InputPath = gbbqZipFile
-				opts.InputType = cmd.GbbqZip
-			} else if c.Flags().Changed("dayzip") {
-				opts.InputPath = dayZipFile
+			case "day4":
 				opts.InputType = cmd.DayZip
+			case "gbbq":
+				opts.InputType = cmd.GbbqZip
+			default:
+				return fmt.Errorf("未知的类型: %s%s", inputType, convertHelp)
 			}
 
-			if err := cmd.Convert(opts); err != nil {
-				return err
-			}
-			return nil
+			return cmd.Convert(opts)
 		},
 	}
 
-	initCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
+	// Init Flags
+	initCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
 	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", dayFileInfo)
-	initCmd.MarkFlagRequired("dbpath")
+	initCmd.MarkFlagRequired("dburi")
 	initCmd.MarkFlagRequired("dayfiledir")
 
-	cronCmd.Flags().StringVar(&dbPath, "dbpath", "", dbPathInfo)
-	cronCmd.MarkFlagRequired("dbpath")
+	// Cron Flags
+	cronCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
+	cronCmd.MarkFlagRequired("dburi")
 	cronCmd.Flags().StringVar(&minline, "minline", "", minLineInfo)
 
-	convertCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", dayFileInfo)
-	convertCmd.Flags().StringVar(&m1FileDir, "m1filedir", "", "通达信 1 分钟 .01 文件目录")
-	convertCmd.Flags().StringVar(&m5FileDir, "m5filedir", "", "通达信 5 分钟 .5 文件目录")
-	convertCmd.Flags().StringVar(&ticZipFile, "ticzip", "", "通达信四代 TIC 压缩文件")
-	convertCmd.Flags().StringVar(&dayZipFile, "dayzip", "", "通达信四代行情压缩文件")
-	convertCmd.Flags().StringVar(&gbbqZipFile, "gbbqzip", "", "通达信股本变迁压缩文件")
-	convertCmd.Flags().StringVar(&outPutFile, "output", "", "parquet 文件输出目录")
+	// Convert Flags
+	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")
+	convertCmd.Flags().StringVarP(&inputPath, "input", "i", "", "输入文件或目录路径")
+	convertCmd.Flags().StringVarP(&outputPath, "output", "o", "", "parquet 文件输出目录")
+	convertCmd.MarkFlagRequired("type")
+	convertCmd.MarkFlagRequired("input")
 	convertCmd.MarkFlagRequired("output")
 
 	rootCmd.AddCommand(initCmd)

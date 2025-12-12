@@ -2,13 +2,11 @@ package cmd
 
 import (
 	"path/filepath"
-	"runtime"
 	"time"
 
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-var maxConcurrency = runtime.NumCPU()
 var Today = time.Now().Truncate(24 * time.Hour)
 
 var TempDir, _ = utils.GetCacheDir()
