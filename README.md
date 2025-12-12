@@ -6,7 +6,7 @@
 
 ## 概述
 
-`tdx2db` 是一个高效的工具，用于将通达信数据导入到 DuckDB 中，构建本地化的 A 股行情数据库。
+`tdx2db` 是一个高效的工具，用于将通达信数据导入本地数据库，支持 DuckDB 和 ClickHouse。
 
 ## 亮点
 
@@ -28,7 +28,7 @@ docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
 
 ### 使用二进制
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 Linux x86_64 中**直接使用：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 x86 Linux 中**直接使用：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
@@ -59,7 +59,14 @@ Expand-Archive -Path "hsjday.zip" -DestinationPath "vipdoc" -Force
 二进制：
 
 ```shell
-tdx2db init --dayfiledir vipdoc --dbpath tdx.db
+  # 使用 DuckDB, dburi 格式： duckdb://[path]，path 支持相对路径
+  tdx2db init --dburi 'duckdb://./tdx.db' --dayfiledir ./vipdoc
+
+  # 使用 ClickHouse, dburi 格式： clickhouse:[user[:password]@][host][:port][/database][?http_port=value1&param2=value2&...]
+  tdx2db init --dburi 'clickhouse://default:123456@localhost:9000/mydb?http_port=8123' --dayfiledir ./vipdoc
+
+  # ClickHouse 有以下默认值: user=default, password="", port=9000, http_port=8123, database=default，可以根据情况简写
+  tdx2db init --dburi 'clickhouse://localhost' --dayfiledir ./vipdoc
 ```
 
 docker 或 podman：
@@ -68,23 +75,21 @@ docker 或 podman：
 # linux、mac docker
 docker run --rm --platform=linux/amd64 -v "$(pwd)":/data \
   ghcr.io/jing2uo/tdx2db:latest \
-  init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+  init --dayfiledir /data/vipdoc --dburi 'duckdb:///data/tdx.db'
 
 # windows docker
 docker run --rm --platform=linux/amd64 -v "${PWD}:/data" \
   ghcr.io/jing2uo/tdx2db:latest \
-  init --dayfiledir /data/vipdoc --dbpath /data/tdx.db
+  init --dayfiledir /data/vipdoc --dburi 'duckdb:///data/tdx.db'
 
 # 后续不再提示 docker 用法
 # 根据二进制示例修改第三行命令即可
 ```
 
-运行结束后 tdx.db 会在当前工作目录， hsjday.zip 和 vipdoc 可删除。
-
 **必填参数**：
 
 - `--dayfiledir`：通达信 .day 文件所在目录
-- `--dbpath`：DuckDB 文件路径
+- `--dburi`：数据库连接信息
 
 ### 增量更新
 
@@ -93,12 +98,12 @@ cron 命令会更新股票数据、股本变迁数据到最新日期，并计算
 初次使用时，请在 init 后立刻执行一次 cron，以获得复权相关数据。
 
 ```bash
-tdx2db cron --dbpath tdx.db
+tdx2db cron --dburi 'duckdb://tdx.db'    # ClickHouse schema 参考 init 部分
 ```
 
 **必填参数**：
 
-- `--dbpath`：DuckDB 文件路径
+- `--dburi`：数据库连接信息
 
 ### 分时数据
 
@@ -106,7 +111,7 @@ cron 命令支持 1min 和 5min 分时数据导入
 
 ```bash
 # --minline 可选 1、5、1,5 ，分别表示只处理1分钟、只处理5分钟、两种都处理
-tdx2db cron --dbpath tdx.db --minline 1,5
+tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 ```
 
 **注意**
@@ -155,37 +160,14 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 ## 通达信数据转 parquet
 
-convert 命令支持转换通达信 .day .01 .5 文件、四代行情 zip、四代 TIC zip 到 parquet，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
+convert 命令支持转换通达信日线、分时文件和四代行情、TIC 压缩包到 parquet，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
 
 ```shell
-tdx2db convert --output ./ --dayfiledir vipdoc       # 转换 .day 日线文件
-tdx2db convert --output ./ --m1filedir vipdoc        # 转换 .01 1分钟线文件
-tdx2db convert --output ./ --m5filedir vipdoc        # 转换 .5  5分钟线文件
-tdx2db convert --output ./ --ticzip 20251110.zip     # 转换四代 TIC
-tdx2db convert --output ./ --dayzip 20251111.zip     # 转换四代行情
-tdx2db convert --output ./ --gbbqzip gbbq.zip        # 转换股本变迁数据
+tdx2db convert -t day -i ./vipdoc/ -o ./   # 转换 .day 日线文件
+tdx2db convert -h   # 其他类型查看 help
 ```
 
 转换会查找目录中所有文件，包含指数、概念等很多非股票的记录，空文件会跳过处理。
-
-## 备份
-
-1. 可以直接复制一份 db 文件，简单快捷
-2. 可以导出行情数据为 parquet 或 csv
-
-duckdb sql 示例：
-
-```bash
-# 导出 stocks 表
-duckdb tdx.db -s "copy (select * from raw_stocks_daily order by symbol,date) to 'stocks.parquet' (format parquet, compression 'zstd')"
-
-duckdb tdx.db -s "copy (select * from raw_stocks_daily order by symbol,date) to 'stocks.csv' (format csv)"
-
-# 从 paruet 或 csv 建表
-duckdb new.db -s "create table raw_stocks_daily as select * from read_parquet('stocks.parquet');"
-
-duckdb new.db -s "create table raw_stocks_daily as select * from read_csv('stocks.csv');"
-```
 
 ## 欢迎 issue 和 pr
 

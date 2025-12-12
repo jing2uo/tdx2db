@@ -2,6 +2,10 @@ package duckdb
 
 import (
 	"fmt"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/model"
@@ -14,8 +18,59 @@ type DuckDBDriver struct {
 	viewImpls map[model.ViewID]func() error
 }
 
-func NewDriver(cfg model.DBConfig) *DuckDBDriver {
-	return &DuckDBDriver{dsn: cfg.DSN, viewImpls: make(map[model.ViewID]func() error)}
+func NewDuckDBDriver(u *url.URL) (*DuckDBDriver, error) {
+
+	var dbPath string
+
+	if u.Host == "." || u.Host == ".." {
+		// 处理 ./ 或 ../
+		dbPath = u.Host + u.Path
+	} else if u.Host != "" {
+		// 处理 duckdb://filename.db
+		dbPath = u.Host + u.Path
+	} else {
+		// 处理 duckdb:///absolute/path.db
+		dbPath = u.Path
+	}
+
+	dbPath = strings.TrimSpace(dbPath)
+
+	// 禁止内存模式
+	if dbPath == "" || dbPath == ":memory:" {
+		return nil, fmt.Errorf("duckdb driver: memory mode is not allowed, please provide a file path (e.g. duckdb://data.db)")
+	}
+	// home 目录展开
+	if strings.HasPrefix(dbPath, "~/") || strings.HasPrefix(dbPath, "~\\") || dbPath == "~" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get user home directory: %w", err)
+		}
+
+		if dbPath == "~" {
+			dbPath = homeDir
+		} else {
+			dbPath = filepath.Join(homeDir, dbPath[1:])
+		}
+	}
+
+	// 3. 准备目录
+	dir := filepath.Dir(dbPath)
+	if dir != "." && dir != "/" {
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			if err := os.MkdirAll(dir, 0755); err != nil {
+				return nil, fmt.Errorf("failed to create directory for duckdb file: %w", err)
+			}
+		}
+	}
+
+	if u.RawQuery != "" {
+		dbPath = fmt.Sprintf("%s?%s", dbPath, u.RawQuery)
+	}
+
+	return &DuckDBDriver{
+		dsn:       dbPath,
+		viewImpls: make(map[model.ViewID]func() error),
+	}, nil
 }
 
 func (d *DuckDBDriver) Connect() error {
@@ -23,9 +78,14 @@ func (d *DuckDBDriver) Connect() error {
 	if err != nil {
 		return err
 	}
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(5)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	db.SetConnMaxLifetime(0)
+
+	if err := db.Ping(); err != nil {
+		_ = db.Close()
+		return fmt.Errorf("duckdb ping failed (check file permissions): %w", err)
+	}
 
 	d.db = db
 	return nil
@@ -36,28 +96,21 @@ func (d *DuckDBDriver) Close() error {
 }
 
 func (d *DuckDBDriver) InitSchema() error {
-	// 1. 定义需要创建的表 (通过 Model 获取 Meta)
 	tables := model.AllTables()
 
-	// 2. 循环建表
 	for _, t := range tables {
-		// 注意：t 现在是 *model.TableMeta
 		if err := d.createTableInternal(t); err != nil {
 			return fmt.Errorf("failed to create table %s: %w", t.TableName, err)
 		}
 	}
-	// 3. 创建视图
 	d.registerViews()
 	for _, viewID := range model.AllViews() {
 
-		// 检查：我(DuckDB)是否实现了这个View？
 		implFunc, exists := d.viewImpls[viewID]
 		if !exists {
-			// 核心逻辑：一旦发现漏网之鱼，直接报错！
 			return fmt.Errorf("[DuckDB] Missing implementation for required view: %s", viewID)
 		}
 
-		// 执行实现逻辑
 		if err := implFunc(); err != nil {
 			return fmt.Errorf("failed to create view %s: %w", viewID, err)
 		}
