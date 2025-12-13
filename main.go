@@ -29,8 +29,7 @@ Type & Input:
   -t 1min  转换 1 分钟分时  -i 包含 .1 的目录
   -t 5min  转换 5 分钟分时  -i 包含 .05 的目录
   -t tic4  转换四代分笔     -i 四代 TIC 压缩文件
-  -t day4  转换四代日线     -i 四代行情压缩文件
-  -t gbbq  转换股本变迁     -i GBBQ 压缩文件`
+  -t day4  转换四代日线     -i 四代行情压缩文件`
 
 func main() {
 	var rootCmd = &cobra.Command{
@@ -98,8 +97,6 @@ func main() {
 				opts.InputType = cmd.TicZip
 			case "day4":
 				opts.InputType = cmd.DayZip
-			case "gbbq":
-				opts.InputType = cmd.GbbqZip
 			default:
 				return fmt.Errorf("未知的类型: %s%s", inputType, convertHelp)
 			}

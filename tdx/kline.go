@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/jing2uo/tdx2db/model"
-	"github.com/parquet-go/parquet-go"
+	"github.com/jing2uo/tdx2db/utils"
 )
 
 // Constants & Configuration
@@ -61,30 +61,8 @@ func runConversion[T any](
 		return "", err
 	}
 
-	// 2. 创建输出文件
-	f, err := os.Create(outputFile)
-	if err != nil {
-		return "", fmt.Errorf("create file error: %w", err)
-	}
-	defer f.Close()
-
-	// 3. 初始化 Parquet Generic Writer
-	writerConfig := []parquet.WriterOption{
-		// 使用 Snappy 压缩 (速度与压缩率平衡)
-		parquet.Compression(&parquet.Snappy),
-
-		// WriteBufferSize 相当于 RowGroup Size。
-		// 设置为 48MB (通常 16MB-128MB 之间较好)，缓冲区满后会刷新为一个 RowGroup。
-		// 大的 RowGroup 有利于压缩，但占用更多内存。
-		parquet.WriteBufferSize(48 * 1024 * 1024),
-
-		// PageBufferSize 是列数据页的目标大小。
-		// 设置为 64KB，这是 Parquet 的推荐值，利于读取时的粒度控制。
-		parquet.PageBufferSize(64 * 1024),
-	}
-
-	// 创建泛型 Writer
-	pw := parquet.NewGenericWriter[T](f, writerConfig...)
+	// 创建 Writer
+	pw, _ := utils.NewParquetWriter[T](outputFile)
 
 	// 4. 并发管道设置
 	batchChan := make(chan batchData[T], maxConcurrency*2)
@@ -110,7 +88,7 @@ func runConversion[T any](
 				continue
 			}
 			if len(batch.Rows) > 0 {
-				if _, err := pw.Write(batch.Rows); err != nil {
+				if err := pw.Write(batch.Rows); err != nil {
 					collectError(fmt.Errorf("parquet write error: %w", err))
 				}
 			}

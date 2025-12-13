@@ -87,6 +87,11 @@ func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 	return d.importParquet(model.TableGbbq, path)
 }
 
+func (d *ClickHouseDriver) ImportXDXR(path string) error {
+	d.truncateTable(model.TableXdxr)
+	return d.importParquet(model.TableXdxr, path)
+}
+
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
 	d.truncateTable(model.TableAdjustFactor)
 	return d.importParquet(model.TableAdjustFactor, path)
@@ -134,20 +139,9 @@ func (d *ClickHouseDriver) GetAllSymbols() ([]string, error) {
 	return symbols, nil
 }
 
-func (d *ClickHouseDriver) QueryAllXdxr() ([]model.XdxrData, error) {
-	var results []model.XdxrData
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY code, date", model.ViewXdxr)
-
-	err := d.db.Select(&results, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query xdxr: %w", err)
-	}
-	return results, nil
-}
-
 func (d *ClickHouseDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
 	query := fmt.Sprintf(
-		"SELECT symbol, open, high, low, close, amount, volume, date FROM %s WHERE symbol = ?",
+		"SELECT symbol, open, high, low, close, date FROM %s WHERE symbol = ? ORDER BY date ASC",
 		model.TableStocksDaily.TableName,
 	)
 

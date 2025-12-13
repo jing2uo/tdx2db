@@ -45,42 +45,31 @@ func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *DuckDBDriver) registerViews() {
-	// 1. 除权除息视图 (ViewXDXR)
-	d.viewImpls[model.ViewXdxr] = func() error {
-		query := fmt.Sprintf(`
-			CREATE OR REPLACE VIEW %s AS
-			SELECT date, code, c1 as fenhong, c2 as peigujia, c3 as songzhuangu, c4 as peigu
-			FROM %s WHERE category = 1
-		`, model.ViewXdxr, model.TableGbbq.TableName)
-		_, err := d.db.Exec(query)
-		return err
-	}
-
-	// 2. 换手率与市值视图 (ViewTurnover)
+	// 换手率与市值视图 (ViewTurnover)
 	d.viewImpls[model.ViewTurnover] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
 			WITH gbbq_sorted AS (
 				SELECT
 					date,
-					code,
-					c3 AS float_shares,
-					c4 AS total_shares
+					symbol,
+					post_float,
+					post_total
 				FROM %s
 				WHERE category IN (2, 3, 5, 7, 8, 9, 10)
-				ORDER BY code, date -- ASOF JOIN 要求右表必须排序
+				ORDER BY symbol, date -- ASOF JOIN 要求右表必须排序
 			)
 			SELECT
 				r.date,
 				r.symbol,
-				CASE WHEN g.float_shares > 0 THEN
-					ROUND(r.volume / (g.float_shares * 10000), 6)
+				CASE WHEN g.post_float > 0 THEN
+					ROUND(r.volume / (g.post_float * 10000), 6)
 				ELSE 0 END AS turnover,
-				ROUND(g.float_shares * 10000 * r.close, 2) AS circ_mv,
-				ROUND(g.total_shares * 10000 * r.close, 2) AS total_mv
+				ROUND(g.post_float * 10000 * r.close, 2) AS float_mv,
+				ROUND(g.post_total * 10000 * r.close, 2) AS total_mv
 			FROM %s r
 			ASOF JOIN gbbq_sorted g
-				ON SUBSTR(r.symbol, 3) = g.code -- 关联代码 (假设 r.symbol 是 sh600000)
+				ON r.symbol = g.symbol
 				AND r.date >= g.date            -- 时间对齐 (找最近的股本)
 		`,
 			model.ViewTurnover,

@@ -2,16 +2,14 @@ package calc
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 	"sort"
 	"sync"
 	"time"
 
-	"github.com/parquet-go/parquet-go"
-
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
+	"github.com/jing2uo/tdx2db/utils"
 )
 
 // internalCombinedData 内部用于合并数据的结构体
@@ -27,148 +25,137 @@ type internalCombinedData struct {
 	Songzhuangu float64
 }
 
-// factorBatch 用于在 Channel 中传递处理结果
-type factorBatch struct {
-	Rows []model.Factor
+var factorConcurrency = runtime.NumCPU()
+
+type batchData[T any] struct {
+	Rows []T
 	Err  error
 }
 
-var maxConcurrency = runtime.NumCPU()
-
-// UpdateFactors 计算复权因子并导出为 Parquet
-func ExportFactorsToParquet(db database.DataRepository, parquetPath string) error {
-
-	// 1. 构建 XDXR 索引 (除权除息数据)
-	xdxrIndex, err := buildXdxrIndex(db)
+func ExportFactorsToParquet(db database.DataRepository, xdxrData []model.XdxrData, parquetPath string) error {
+	// 1. 准备数据：构建索引与获取代码列表
+	xdxrIndex, err := buildXdxrIndex(xdxrData)
 	if err != nil {
 		return fmt.Errorf("failed to build XDXR index: %w", err)
 	}
 
-	// 2. 获取所有股票代码
 	symbols, err := db.GetAllSymbols()
 	if err != nil {
 		return fmt.Errorf("failed to query all stock symbols: %w", err)
 	}
 
-	// 3. 创建 Parquet 文件 writer
-	f, err := os.Create(parquetPath)
+	// 2. 初始化 Parquet Writer
+	pw, err := utils.NewParquetWriter[model.Factor](parquetPath)
 	if err != nil {
-		return fmt.Errorf("failed to create parquet file %s: %w", parquetPath, err)
-	}
-	defer f.Close()
-
-	// 配置 Parquet Writer
-	writerConfig := []parquet.WriterOption{
-		parquet.Compression(&parquet.Snappy),
-		parquet.WriteBufferSize(48 * 1024 * 1024), // 48MB RowGroup Buffer
-		parquet.PageBufferSize(64 * 1024),         // 64KB Page Buffer
+		return err
 	}
 
-	pw := parquet.NewGenericWriter[model.Factor](f, writerConfig...)
-	defer pw.Close() // 确保数据刷入磁盘
+	// 3. 并发管道设置
+	// Channel 用于传递处理好的一只股票的所有因子数据
+	batchChan := make(chan batchData[model.Factor], factorConcurrency*2)
+	sem := make(chan struct{}, factorConcurrency)
 
-	// 4. 并发处理管道
-	batchChan := make(chan factorBatch, maxConcurrency*4)
-	var wg sync.WaitGroup
-	var writerWg sync.WaitGroup
-	sem := make(chan struct{}, maxConcurrency) // 限制并发读取/计算的数量
+	var producerWg sync.WaitGroup
+	var consumerWg sync.WaitGroup
 
-	// --- Consumer: 单协程写入 Parquet ---
-	writerWg.Add(1)
+	// 错误收集器
+	var errors []string
+	var errMu sync.Mutex
+	collectError := func(e error) {
+		errMu.Lock()
+		errors = append(errors, e.Error())
+		errMu.Unlock()
+	}
+
+	// --- Consumer: 负责写入 Parquet ---
+	consumerWg.Add(1)
 	go func() {
-		defer writerWg.Done()
+		defer consumerWg.Done()
+		defer pw.Close() // 确保全部写完后关闭文件
+
 		for batch := range batchChan {
 			if batch.Err != nil {
-				fmt.Printf("计算错误: %v\n", batch.Err)
+				collectError(batch.Err)
 				continue
 			}
 			if len(batch.Rows) > 0 {
-				if _, err := pw.Write(batch.Rows); err != nil {
-					fmt.Printf("Parquet 写入失败: %v\n", err)
+				if err := pw.Write(batch.Rows); err != nil {
+					collectError(fmt.Errorf("parquet write error: %w", err))
 				}
 			}
 		}
 	}()
 
-	// --- Producer: 并发计算 ---
+	// --- Producer: 并发查询与计算 ---
 	for _, symbol := range symbols {
-		wg.Add(1)
-		sem <- struct{}{} // 获取令牌
+		producerWg.Add(1)
 
-		go func(sym string) {
-			defer wg.Done()
-			defer func() { <-sem }() // 释放令牌
+		go func() {
+			sem <- struct{}{} // 获取令牌
+			defer func() {
+				<-sem // 释放令牌
+				producerWg.Done()
+			}()
 
-			// 查询个股行情数据
-			stockData, err := db.QueryStockData(sym, nil, nil)
-			if err != nil {
-				batchChan <- factorBatch{Err: fmt.Errorf("symbol %s query failed: %w", sym, err)}
-				return
+			// 执行业务逻辑
+			rows, err := processStockFactor(db, xdxrIndex, symbol)
+
+			// 发送结果到 Consumer
+			batchChan <- batchData[model.Factor]{
+				Rows: rows,
+				Err:  err,
 			}
-
-			// 获取除权数据
-			xdxrData := getXdxrByCode(xdxrIndex, sym)
-
-			// 计算因子 (假设返回的是 []model.Factor 或类似的结构切片)
-			factors, err := CalculateFqFactor(stockData, xdxrData)
-			if err != nil {
-				batchChan <- factorBatch{Err: fmt.Errorf("symbol %s calc failed: %w", sym, err)}
-				return
-			}
-
-			// 转换数据格式 (Model -> Parquet Struct)
-			// 预分配内存，避免 append 扩容开销
-			parquetRows := make([]model.Factor, len(factors))
-			for i, factor := range factors {
-				parquetRows[i] = model.Factor{
-					Symbol:    factor.Symbol,
-					Date:      factor.Date,
-					Close:     factor.Close,
-					PreClose:  factor.PreClose,
-					QfqFactor: factor.QfqFactor,
-					HfqFactor: factor.HfqFactor,
-				}
-			}
-
-			// 发送整个切片到 Channel
-			batchChan <- factorBatch{Rows: parquetRows}
-		}(symbol)
+		}()
 	}
 
-	// 等待所有计算任务完成
-	wg.Wait()
-	close(batchChan) // 关闭通道，通知 Writer 结束
-	writerWg.Wait()  // 等待写入完成
+	// 等待所有生产者完成 -> 关闭通道 -> 等待消费者完成
+	producerWg.Wait()
+	close(batchChan)
+	consumerWg.Wait()
+
+	// 4. 返回结果
+	if len(errors) > 0 {
+		return fmt.Errorf("export completed with %d errors, first: %s", len(errors), errors[0])
+	}
 	return nil
 }
 
-// --- 辅助函数 (保持逻辑不变，仅作类型适配) ---
+// processStockFactor 将具体的业务逻辑抽离，保持主流程清晰
+func processStockFactor(db database.DataRepository, xdxrIndex map[string][]model.XdxrData, symbol string) ([]model.Factor, error) {
+	// 优化建议：确保 SQL 语句带上 ORDER BY date ASC，
+	stockData, err := db.QueryStockData(symbol, nil, nil)
+	if err != nil {
+		return nil, fmt.Errorf("symbol %s query failed: %w", symbol, err)
+	}
+
+	if len(stockData) == 0 {
+		return nil, nil
+	}
+
+	xdxr := getXdxrBySymbol(xdxrIndex, symbol)
+	factors, err := CalculateFqFactor(stockData, xdxr)
+	if err != nil {
+		return nil, fmt.Errorf("symbol %s calc failed: %w", symbol, err)
+	}
+
+	return factors, nil
+}
 
 type XdxrIndex map[string][]model.XdxrData
 
-func buildXdxrIndex(db database.DataRepository) (XdxrIndex, error) {
+func buildXdxrIndex(xdxrData []model.XdxrData) (XdxrIndex, error) {
 	index := make(XdxrIndex)
 
-	xdxrData, err := db.QueryAllXdxr()
-	if err != nil {
-		return nil, fmt.Errorf("failed to query xdxr data: %w", err)
-	}
-
 	for _, data := range xdxrData {
-		code := data.Code
-		index[code] = append(index[code], data)
+		symbol := data.Symbol
+		index[symbol] = append(index[symbol], data)
 	}
 
 	return index, nil
 }
 
-func getXdxrByCode(index XdxrIndex, symbol string) []model.XdxrData {
-	// 假设 symbol 格式为 "sh600000"，这里截取 "600000"
-	if len(symbol) <= 2 {
-		return []model.XdxrData{}
-	}
-	code := symbol[2:]
-	if data, exists := index[code]; exists {
+func getXdxrBySymbol(index XdxrIndex, symbol string) []model.XdxrData {
+	if data, exists := index[symbol]; exists {
 		return data
 	}
 	return []model.XdxrData{}
@@ -178,10 +165,6 @@ func CalculateFqFactor(stockData []model.StockData, xdxrData []model.XdxrData) (
 	// 如果 xdxrData 为空，说明没有除权除息事件，采用快速路径处理。
 	// 此时，前复权和后复权的因子均为 1.0。
 	if len(xdxrData) == 0 {
-		// 确保 stockData 按日期升序排序
-		sort.Slice(stockData, func(i, j int) bool {
-			return stockData[i].Date.Before(stockData[j].Date)
-		})
 		result := make([]model.Factor, 0, len(stockData))
 		if len(stockData) == 0 {
 			return result, nil

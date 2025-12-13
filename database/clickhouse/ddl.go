@@ -9,10 +9,8 @@ import (
 
 // mapType 针对 ClickHouse 进行类型优化
 func (d *ClickHouseDriver) mapType(colName string, dt model.DataType) string {
-	// 性能优化：对于 code 或 symbol 使用 LowCardinality
-	isKey := strings.Contains(strings.ToLower(colName), "code") ||
-		strings.Contains(strings.ToLower(colName), "symbol") ||
-		strings.Contains(strings.ToLower(colName), "category")
+	isKey := strings.Contains(strings.ToLower(colName), "symbol") //||
+	//strings.Contains(strings.ToLower(colName), "category")
 
 	switch dt {
 	case model.TypeString:
@@ -47,7 +45,7 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 		if lowerName == "date" || lowerName == "datetime" {
 			dateCol = col.Name
 		}
-		if lowerName == "symbol" || lowerName == "code" {
+		if lowerName == "symbol" {
 			keyCol = col.Name
 		}
 	}
@@ -75,49 +73,31 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *ClickHouseDriver) registerViews() {
-	// 1. 除权除息视图
-	d.viewImpls[model.ViewXdxr] = func() error {
-		query := fmt.Sprintf(`
-			CREATE OR REPLACE VIEW %s AS
-			SELECT
-				date,
-				code,
-				c1 as fenhong,
-				c2 as peigujia,
-				c3 as songzhuangu,
-				c4 as peigu
-			FROM %s
-			WHERE category = 1
-		`, model.ViewXdxr, model.TableGbbq.TableName)
-		_, err := d.db.Exec(query)
-		return err
-	}
-
-	// 2. 换手率与市值视图
+	// 换手率与市值视图
 	d.viewImpls[model.ViewTurnover] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
 			WITH gbbq_sorted AS (
 				SELECT
-					code,
-					date,
-					c3 AS float_shares,
-					c4 AS total_shares
-				FROM %s
-				WHERE category IN (2, 3, 5, 7, 8, 9, 10)
-				ORDER BY code, date -- ASOF JOIN 必须排序
+					t.symbol,
+					t.date,
+					t.post_float,
+					t.post_total
+				FROM %s AS t
+				WHERE t.category IN (2, 3, 5, 7, 8, 9, 10)
+				ORDER BY t.symbol, t.date
 			)
 			SELECT
 				r.date,
 				r.symbol,
-				CASE WHEN g.float_shares > 0 THEN
-					ROUND(r.volume / (g.float_shares * 10000), 6)
+				CASE WHEN g.post_float > 0 THEN
+					ROUND(r.volume / (g.post_float * 10000), 6)
 				ELSE 0 END AS turnover,
-				ROUND(g.float_shares * 10000 * r.close, 2) AS circ_mv,
-				ROUND(g.total_shares * 10000 * r.close, 2) AS total_mv
+				ROUND(g.post_float * 10000 * r.close, 2) AS float_mv,
+				ROUND(g.post_total * 10000 * r.close, 2) AS total_mv
 			FROM %s r
 			ASOF LEFT JOIN gbbq_sorted g
-				ON substring(r.symbol, 3) = g.code AND r.date >= g.date
+				ON r.symbol = g.symbol AND r.date >= g.date
 		`,
 			model.ViewTurnover,
 			model.TableGbbq.TableName,

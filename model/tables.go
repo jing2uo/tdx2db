@@ -141,22 +141,22 @@ type Factor struct {
 }
 
 type GbbqData struct {
-	Category int       `col:"category" parquet:"category"`
-	Code     string    `col:"code"     parquet:"code,dict"`
-	Date     time.Time `col:"date"     parquet:"date"    type:"date"`
-	C1       float64   `col:"c1"       parquet:"c1"`
-	C2       float64   `col:"c2"       parquet:"c2"`
-	C3       float64   `col:"c3"       parquet:"c3"`
-	C4       float64   `col:"c4"       parquet:"c4"`
+	Category  int       `col:"category"    parquet:"category"`
+	Symbol    string    `col:"symbol"      parquet:"symbol,dict"`
+	Date      time.Time `col:"date"        parquet:"date"    type:"date"`
+	PreFloat  float64   `col:"pre_float"   parquet:"pre_float"`
+	PreTotal  float64   `col:"pre_total"   parquet:"pre_total"`
+	PostFloat float64   `col:"post_float"  parquet:"post_float"`
+	PostTotal float64   `col:"post_total"  parquet:"post_total"`
 }
 
 type XdxrData struct {
-	Code        string    `col:"code"`
-	Date        time.Time `col:"date"         type:"date"`
-	Fenhong     float64   `col:"fenhong"`
-	Peigujia    float64   `col:"peigujia"`
-	Songzhuangu float64   `col:"songzhuangu"`
-	Peigu       float64   `col:"peigu"`
+	Symbol      string    `col:"symbol"       parquet:"symbol,dict"`
+	Date        time.Time `col:"date"         parquet:"date"     type:"date"`
+	Fenhong     float64   `col:"fenhong"      parquet:"fenhong"`
+	Peigujia    float64   `col:"peigujia"     parquet:"peigujia"`
+	Songzhuangu float64   `col:"songzhuangu"  parquet:"songzhuangu"`
+	Peigu       float64   `col:"peigu"        parquet:"peigu"`
 }
 
 // --- 表结构元数据 (TableMeta) ---
@@ -188,5 +188,11 @@ var TableAdjustFactor = SchemaFromStruct(
 var TableGbbq = SchemaFromStruct(
 	"raw_gbbq",
 	GbbqData{},
-	[]string{"code", "date"},
+	[]string{"symbol", "date"},
+)
+
+var TableXdxr = SchemaFromStruct(
+	"raw_xdxr",
+	XdxrData{},
+	[]string{"symbol", "date"},
 )
