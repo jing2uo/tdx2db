@@ -128,9 +128,9 @@ func main() {
 	rootCmd.AddCommand(cronCmd)
 	rootCmd.AddCommand(convertCmd)
 
-	//cobra.OnFinalize(func() {
-	//	os.RemoveAll(cmd.TempDir)
-	//})
+	cobra.OnFinalize(func() {
+		os.RemoveAll(cmd.TempDir)
+	})
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "🛑 错误: %v\n", err)
