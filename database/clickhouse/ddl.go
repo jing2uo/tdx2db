@@ -25,7 +25,7 @@ func (d *ClickHouseDriver) mapType(colName string, dt model.DataType) string {
 	case model.TypeDate:
 		return "Date32" // Date32 范围比 Date 更大 (1900-2299)
 	case model.TypeDateTime:
-		return "DateTime64(0)"
+		return "DateTime64(0, 'Asia/Shanghai')"
 	default:
 		return "String"
 	}

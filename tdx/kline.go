@@ -31,8 +31,7 @@ type batchData[T any] struct {
 
 // Main Entry Point
 
-// ConvertFilesToParquet 自动根据后缀选择类型进行转换
-func ConvertFilesToParquet(inputDir string, validPrefixes []string, outputFile string, suffix string) (string, error) {
+func ConvertFilesToCSV(inputDir string, validPrefixes []string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
 		// 使用泛型函数处理 StockData
@@ -62,7 +61,7 @@ func runConversion[T any](
 	}
 
 	// 创建 Writer
-	pw, _ := utils.NewParquetWriter[T](outputFile)
+	cw, _ := utils.NewCSVWriter[T](outputFile)
 
 	// 4. 并发管道设置
 	batchChan := make(chan batchData[T], maxConcurrency*2)
@@ -79,17 +78,17 @@ func runConversion[T any](
 		errMu.Unlock()
 	}
 
-	// Consumer: 写入 Parquet
+	// Consumer: 写入 CSV
 	consumerWg.Go(func() {
-		defer pw.Close() // 确保数据落盘
+		defer cw.Close() // 确保数据落盘
 		for batch := range batchChan {
 			if batch.Err != nil {
 				collectError(batch.Err)
 				continue
 			}
 			if len(batch.Rows) > 0 {
-				if err := pw.Write(batch.Rows); err != nil {
-					collectError(fmt.Errorf("parquet write error: %w", err))
+				if err := cw.Write(batch.Rows); err != nil {
+					collectError(fmt.Errorf("csv write error: %w", err))
 				}
 			}
 		}
@@ -97,7 +96,6 @@ func runConversion[T any](
 
 	// Producer: 读取并解析文件
 	for _, file := range files {
-		file := file
 		producerWg.Go(func() {
 			sem <- struct{}{}
 			defer func() { <-sem }()

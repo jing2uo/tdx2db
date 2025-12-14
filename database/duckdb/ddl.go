@@ -19,7 +19,7 @@ func (d *DuckDBDriver) mapType(dt model.DataType) string {
 	case model.TypeDate:
 		return "DATE"
 	case model.TypeDateTime:
-		return "TIMESTAMP"
+		return "TIMESTAMP WITH TIME ZONE"
 	default:
 		return "VARCHAR"
 	}
