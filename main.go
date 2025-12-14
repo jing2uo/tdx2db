@@ -77,7 +77,7 @@ func main() {
 
 	var convertCmd = &cobra.Command{
 		Use:   "convert",
-		Short: "Convert TDX data to parquet",
+		Short: "Convert TDX data to CSV",
 		Example: `  tdx2db convert -t day -i /path/to/vipdoc/ -o ./
   tdx2db convert -t day4 -i /path/to/20251212.zip -o ./` + convertHelp,
 		RunE: func(c *cobra.Command, args []string) error {
@@ -119,7 +119,7 @@ func main() {
 	// Convert Flags
 	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")
 	convertCmd.Flags().StringVarP(&inputPath, "input", "i", "", "输入文件或目录路径")
-	convertCmd.Flags().StringVarP(&outputPath, "output", "o", "", "parquet 文件输出目录")
+	convertCmd.Flags().StringVarP(&outputPath, "output", "o", "", "CSV 文件输出目录")
 	convertCmd.MarkFlagRequired("type")
 	convertCmd.MarkFlagRequired("input")
 	convertCmd.MarkFlagRequired("output")
@@ -128,9 +128,9 @@ func main() {
 	rootCmd.AddCommand(cronCmd)
 	rootCmd.AddCommand(convertCmd)
 
-	cobra.OnFinalize(func() {
-		os.RemoveAll(cmd.TempDir)
-	})
+	//cobra.OnFinalize(func() {
+	//	os.RemoveAll(cmd.TempDir)
+	//})
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "🛑 错误: %v\n", err)

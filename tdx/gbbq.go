@@ -95,10 +95,10 @@ func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, []model.XdxrData, error)
 			xdxrResult = append(xdxrResult, model.XdxrData{
 				Symbol:      symbol,
 				Date:        dateTime,
-				Fenhong:     c1, // parquet:"fenhong"
-				Peigujia:    c2, // parquet:"peigujia"
-				Songzhuangu: c3, // parquet:"songzhuangu"
-				Peigu:       c4, // parquet:"peigu"
+				Fenhong:     c1,
+				Peigujia:    c2,
+				Songzhuangu: c3,
+				Peigu:       c4,
 			})
 		} else {
 			// 股本变动数据

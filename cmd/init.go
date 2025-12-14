@@ -31,14 +31,14 @@ func Init(dbURI, dayFileDir string) error {
 	}
 
 	fmt.Println("🐢 开始转换日线数据")
-	_, err = tdx.ConvertFilesToParquet(dayFileDir, ValidPrefixes, StockDailyParquet, ".day")
+	_, err = tdx.ConvertFilesToCSV(dayFileDir, ValidPrefixes, StockDailyCSV, ".day")
 	if err != nil {
-		return fmt.Errorf("failed to convert day files to parquet: %w", err)
+		return fmt.Errorf("failed to convert day files to csv: %w", err)
 	}
 	fmt.Println("🔥 转换完成")
 
-	if err := db.ImportDailyStocks(StockDailyParquet); err != nil {
-		return fmt.Errorf("failed to import stock parquet: %w", err)
+	if err := db.ImportDailyStocks(StockDailyCSV); err != nil {
+		return fmt.Errorf("failed to import stock csv: %w", err)
 	}
 
 	fmt.Println("🚀 股票数据导入成功")

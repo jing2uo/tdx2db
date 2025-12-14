@@ -32,7 +32,7 @@ type batchData[T any] struct {
 	Err  error
 }
 
-func ExportFactorsToParquet(db database.DataRepository, xdxrData []model.XdxrData, parquetPath string) error {
+func ExportFactorsToCSV(db database.DataRepository, xdxrData []model.XdxrData, csvPath string) error {
 	// 1. 准备数据：构建索引与获取代码列表
 	xdxrIndex, err := buildXdxrIndex(xdxrData)
 	if err != nil {
@@ -44,8 +44,7 @@ func ExportFactorsToParquet(db database.DataRepository, xdxrData []model.XdxrDat
 		return fmt.Errorf("failed to query all stock symbols: %w", err)
 	}
 
-	// 2. 初始化 Parquet Writer
-	pw, err := utils.NewParquetWriter[model.Factor](parquetPath)
+	cw, err := utils.NewCSVWriter[model.Factor](csvPath)
 	if err != nil {
 		return err
 	}
@@ -67,11 +66,11 @@ func ExportFactorsToParquet(db database.DataRepository, xdxrData []model.XdxrDat
 		errMu.Unlock()
 	}
 
-	// --- Consumer: 负责写入 Parquet ---
+	// Consumer: 写入 CSV
 	consumerWg.Add(1)
 	go func() {
 		defer consumerWg.Done()
-		defer pw.Close() // 确保全部写完后关闭文件
+		defer cw.Close() // 确保全部写完后关闭文件
 
 		for batch := range batchChan {
 			if batch.Err != nil {
@@ -79,8 +78,8 @@ func ExportFactorsToParquet(db database.DataRepository, xdxrData []model.XdxrDat
 				continue
 			}
 			if len(batch.Rows) > 0 {
-				if err := pw.Write(batch.Rows); err != nil {
-					collectError(fmt.Errorf("parquet write error: %w", err))
+				if err := cw.Write(batch.Rows); err != nil {
+					collectError(fmt.Errorf("csv write error: %w", err))
 				}
 			}
 		}

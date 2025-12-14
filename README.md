@@ -1,4 +1,4 @@
-# tdx2db - 获得你专属的 A 股行情数据库
+# tdx2db - 获得专属的 A 股行情数据库
 
 [![GitHub release](https://img.shields.io/github/v/release/jing2uo/tdx2db?style=flat-square)](https://github.com/jing2uo/tdx2db/releases)
 [![Docker Image](https://img.shields.io/badge/docker-pull-blue?style=flat-square&logo=docker)](https://github.com/jing2uo/tdx2db/pkgs/container/tdx2db)
@@ -157,9 +157,9 @@ select * from raw_adjust_factor where symbol='sz000001';
 
 复权结果和 QUANTAXIS、通达信等比复权一致；其中前复权结果和雪球、新浪也一致。
 
-## 通达信数据转 parquet
+## 通达信数据转 CSV
 
-convert 命令支持转换通达信日线、分时文件和四代行情、TIC 压缩包到 parquet，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
+convert 命令支持转换通达信日线、分时文件和四代行情、TIC 压缩包到 CSV，四代数据可以在 [每日数据](https://www.tdx.com.cn/article/daydata.html) 下载。
 
 ```shell
 tdx2db convert -t day -i ./vipdoc/ -o ./   # 转换 .day 日线文件

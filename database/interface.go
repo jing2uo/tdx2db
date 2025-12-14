@@ -12,12 +12,12 @@ type DataRepository interface {
 
 	InitSchema() error
 
-	ImportDailyStocks(parquetPath string) error
-	Import1MinStocks(parquetPath string) error
-	Import5MinStocks(parquetPath string) error
-	ImportAdjustFactors(parquetPath string) error
-	ImportGBBQ(parquetPath string) error
-	ImportXDXR(parquetPath string) error
+	ImportDailyStocks(csvPath string) error
+	Import1MinStocks(csvPath string) error
+	Import5MinStocks(csvPath string) error
+	ImportAdjustFactors(csvPath string) error
+	ImportGBBQ(csvPath string) error
+	ImportXDXR(csvPath string) error
 
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
 	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)

@@ -56,12 +56,12 @@ func UpdateStocksDaily(db database.DataRepository) error {
 	}
 	if len(validDates) > 0 {
 		fmt.Printf("🐢 开始转换日线数据\n")
-		_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, StockDailyParquet, ".day")
+		_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, StockDailyCSV, ".day")
 		if err != nil {
-			return fmt.Errorf("failed to convert day files to parquet: %w", err)
+			return fmt.Errorf("failed to convert day files to csv: %w", err)
 		}
-		if err := db.ImportDailyStocks(StockDailyParquet); err != nil {
-			return fmt.Errorf("failed to import stock parquet: %w", err)
+		if err := db.ImportDailyStocks(StockDailyCSV); err != nil {
+			return fmt.Errorf("failed to import stock csv: %w", err)
 		}
 		fmt.Println("📊 日线数据导入成功")
 	} else {
@@ -148,22 +148,22 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 		for _, p := range parts {
 			switch p {
 			case "1":
-				_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, Stock1MinParquet, ".01")
+				_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, Stock1MinCSV, ".01")
 				if err != nil {
-					return fmt.Errorf("failed to convert .01 files to parquet: %w", err)
+					return fmt.Errorf("failed to convert .01 files to csv: %w", err)
 				}
-				if err := db.Import1MinStocks(Stock1MinParquet); err != nil {
-					return fmt.Errorf("failed to import 1-minute line parquet: %w", err)
+				if err := db.Import1MinStocks(Stock1MinCSV); err != nil {
+					return fmt.Errorf("failed to import 1-minute line csv: %w", err)
 				}
 				fmt.Println("📊 1分钟数据导入成功")
 
 			case "5":
-				_, err := tdx.ConvertFilesToParquet(VipdocDir, ValidPrefixes, Stock5MinParquet, ".5")
+				_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, Stock5MinCSV, ".5")
 				if err != nil {
-					return fmt.Errorf("failed to convert .5 files to parquet: %w", err)
+					return fmt.Errorf("failed to convert .5 files to csv: %w", err)
 				}
-				if err := db.Import5MinStocks(Stock5MinParquet); err != nil {
-					return fmt.Errorf("failed to import 5-minute line parquet: %w", err)
+				if err := db.Import5MinStocks(Stock5MinCSV); err != nil {
+					return fmt.Errorf("failed to import 5-minute line csv: %w", err)
 				}
 				fmt.Println("📊 5分钟数据导入成功")
 			}
@@ -187,35 +187,35 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 		return fmt.Errorf("failed to decode GBBQ: %w", err)
 	}
 
-	gbbqParquet := filepath.Join(TempDir, "gbbq.parquet")
-	gbbqPw, _ := utils.NewParquetWriter[model.GbbqData](gbbqParquet)
-	if err := gbbqPw.Write(gbbqData); err != nil {
+	gbbqCSV := filepath.Join(TempDir, "gbbq.csv")
+	gbbqCw, _ := utils.NewCSVWriter[model.GbbqData](gbbqCSV)
+	if err := gbbqCw.Write(gbbqData); err != nil {
 		return err
 	}
-	gbbqPw.Close()
-	if err := db.ImportGBBQ(gbbqParquet); err != nil {
-		return fmt.Errorf("failed to import GBBQ parquet into database: %w", err)
+	gbbqCw.Close()
+	if err := db.ImportGBBQ(gbbqCSV); err != nil {
+		return fmt.Errorf("failed to import GBBQ csv into database: %w", err)
 	}
 
-	xdxrParquet := filepath.Join(TempDir, "xdxr.parquet")
-	xdxrPw, _ := utils.NewParquetWriter[model.XdxrData](xdxrParquet)
-	if err := xdxrPw.Write(xdxrData); err != nil {
+	xdxrCSV := filepath.Join(TempDir, "xdxr.csv")
+	xdxrCw, _ := utils.NewCSVWriter[model.XdxrData](xdxrCSV)
+	if err := xdxrCw.Write(xdxrData); err != nil {
 		return err
 	}
-	xdxrPw.Close()
-	if err := db.ImportXDXR(xdxrParquet); err != nil {
-		return fmt.Errorf("failed to import XDXR parquet into database: %w", err)
+	xdxrCw.Close()
+	if err := db.ImportXDXR(xdxrCSV); err != nil {
+		return fmt.Errorf("failed to import XDXR csv into database: %w", err)
 	}
 
 	fmt.Println("📈 股本变迁数据导入成功")
 
 	fmt.Println("📟 计算所有股票复权因子")
-	factorParquet := filepath.Join(TempDir, "factors.parquet")
+	factorCSV := filepath.Join(TempDir, "factors.csv")
 
-	if err := calc.ExportFactorsToParquet(db, xdxrData, factorParquet); err != nil {
-		return fmt.Errorf("failed to export factor to parquet: %w", err)
+	if err := calc.ExportFactorsToCSV(db, xdxrData, factorCSV); err != nil {
+		return fmt.Errorf("failed to export factor to csv: %w", err)
 	}
-	if err := db.ImportAdjustFactors(factorParquet); err != nil {
+	if err := db.ImportAdjustFactors(factorCSV); err != nil {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 	fmt.Println("🔢 复权因子导入成功")

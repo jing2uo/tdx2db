@@ -9,11 +9,24 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
-func (d *DuckDBDriver) importParquet(meta *model.TableMeta, parquetPath string) error {
+func (d *DuckDBDriver) importCSV(meta *model.TableMeta, csvPath string) error {
+	var colMaps []string
+	for _, col := range meta.Columns {
+		duckType := d.mapType(col.Type)
+		colMaps = append(colMaps, fmt.Sprintf("'%s': '%s'", col.Name, duckType))
+	}
+
+	columnsStr := strings.Join(colMaps, ", ")
+
 	query := fmt.Sprintf(`
-        INSERT INTO %s BY NAME
-        SELECT * FROM read_parquet('%s')
-    `, meta.TableName, parquetPath)
+		INSERT INTO %s
+		SELECT * FROM read_csv('%s',
+			header=true,
+			columns={%s},
+			dateformat='%%Y-%%m-%%d',
+			timestampformat='%%Y-%%m-%%d %%H:%%M'
+		)
+	`, meta.TableName, csvPath, columnsStr)
 
 	_, err := d.db.Exec(query)
 	return err
@@ -32,30 +45,30 @@ func (d *DuckDBDriver) truncateTable(meta *model.TableMeta) error {
 }
 
 func (d *DuckDBDriver) ImportDailyStocks(path string) error {
-	return d.importParquet(model.TableStocksDaily, path)
+	return d.importCSV(model.TableStocksDaily, path)
 }
 
 func (d *DuckDBDriver) Import1MinStocks(path string) error {
-	return d.importParquet(model.TableStocks1Min, path)
+	return d.importCSV(model.TableStocks1Min, path)
 }
 
 func (d *DuckDBDriver) Import5MinStocks(path string) error {
-	return d.importParquet(model.TableStocks5Min, path)
+	return d.importCSV(model.TableStocks5Min, path)
 }
 
 func (d *DuckDBDriver) ImportGBBQ(path string) error {
 	d.truncateTable(model.TableGbbq)
-	return d.importParquet(model.TableGbbq, path)
+	return d.importCSV(model.TableGbbq, path)
 }
 
 func (d *DuckDBDriver) ImportXDXR(path string) error {
 	d.truncateTable(model.TableXdxr)
-	return d.importParquet(model.TableXdxr, path)
+	return d.importCSV(model.TableXdxr, path)
 }
 
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
 	d.truncateTable(model.TableAdjustFactor)
-	return d.importParquet(model.TableAdjustFactor, path)
+	return d.importCSV(model.TableAdjustFactor, path)
 }
 
 func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

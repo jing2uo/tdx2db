@@ -13,7 +13,7 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
-func (d *ClickHouseDriver) importParquet(meta *model.TableMeta, filePath string) error {
+func (d *ClickHouseDriver) importCSV(meta *model.TableMeta, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -25,6 +25,8 @@ func (d *ClickHouseDriver) importParquet(meta *model.TableMeta, filePath string)
 		return err
 	}
 
+	req.Header.Set("Content-Type", "text/csv")
+
 	// 设置参数
 	q := req.URL.Query()
 
@@ -32,8 +34,9 @@ func (d *ClickHouseDriver) importParquet(meta *model.TableMeta, filePath string)
 		q.Set("database", d.database)
 	}
 
-	q.Add("query", fmt.Sprintf("INSERT INTO %s FORMAT Parquet", meta.TableName))
-	q.Add("max_partitions_per_insert_block", "1000")
+	q.Add("query", fmt.Sprintf("INSERT INTO %s FORMAT CSVWithNames", meta.TableName))
+	q.Add("date_time_input_format", "best_effort")
+
 	req.URL.RawQuery = q.Encode()
 
 	if d.authUser != "" {
@@ -71,30 +74,30 @@ func (d *ClickHouseDriver) truncateTable(meta *model.TableMeta) error {
 }
 
 func (d *ClickHouseDriver) ImportDailyStocks(path string) error {
-	return d.importParquet(model.TableStocksDaily, path)
+	return d.importCSV(model.TableStocksDaily, path)
 }
 
 func (d *ClickHouseDriver) Import1MinStocks(path string) error {
-	return d.importParquet(model.TableStocks1Min, path)
+	return d.importCSV(model.TableStocks1Min, path)
 }
 
 func (d *ClickHouseDriver) Import5MinStocks(path string) error {
-	return d.importParquet(model.TableStocks5Min, path)
+	return d.importCSV(model.TableStocks5Min, path)
 }
 
 func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 	d.truncateTable(model.TableGbbq)
-	return d.importParquet(model.TableGbbq, path)
+	return d.importCSV(model.TableGbbq, path)
 }
 
 func (d *ClickHouseDriver) ImportXDXR(path string) error {
 	d.truncateTable(model.TableXdxr)
-	return d.importParquet(model.TableXdxr, path)
+	return d.importCSV(model.TableXdxr, path)
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
 	d.truncateTable(model.TableAdjustFactor)
-	return d.importParquet(model.TableAdjustFactor, path)
+	return d.importCSV(model.TableAdjustFactor, path)
 }
 
 func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

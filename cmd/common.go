@@ -11,9 +11,9 @@ var Today = time.Now().Truncate(24 * time.Hour)
 
 var TempDir, _ = utils.GetCacheDir()
 var VipdocDir = filepath.Join(TempDir, "vipdoc")
-var StockDailyParquet = filepath.Join(TempDir, "stock.parquet")
-var Stock1MinParquet = filepath.Join(TempDir, "1min.parquet")
-var Stock5MinParquet = filepath.Join(TempDir, "5min.parquet")
+var StockDailyCSV = filepath.Join(TempDir, "stock.csv")
+var Stock1MinCSV = filepath.Join(TempDir, "1min.csv")
+var Stock5MinCSV = filepath.Join(TempDir, "5min.csv")
 
 var ValidPrefixes = []string{
 	"sz30",     // 创业板
