@@ -14,8 +14,6 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-type XdxrIndex map[string][]model.XdxrData
-
 func Cron(dbURI string, minline string) error {
 	db, err := database.NewDB(dbURI)
 	if err != nil {
@@ -37,16 +35,10 @@ func Cron(dbURI string, minline string) error {
 		return fmt.Errorf("failed to update minute-line stock data: %w", err)
 	}
 
-	err = UpdateGbbq(db)
+	err = UpdateGbbqAndFactors(db)
 	if err != nil {
 		return fmt.Errorf("failed to update GBBQ: %w", err)
 	}
-
-	err = UpdateFactors(db)
-	if err != nil {
-		return fmt.Errorf("failed to calculate factors: %w", err)
-	}
-
 	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
@@ -182,32 +174,48 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 	return nil
 }
 
-func UpdateGbbq(db database.DataRepository) error {
+func UpdateGbbqAndFactors(db database.DataRepository) error {
 	fmt.Println("🐢 开始下载股本变迁数据")
 
 	gbbqFile, err := getGbbqFile(TempDir)
 	if err != nil {
 		return fmt.Errorf("failed to download GBBQ file: %w", err)
 	}
-	gbbqParquet := filepath.Join(TempDir, "gbbq.parquet")
-	if _, err := tdx.ConvertGbbqFileToParquet(gbbqFile, gbbqParquet); err != nil {
-		return fmt.Errorf("failed to convert GBBQ to parquet: %w", err)
+
+	gbbqData, xdxrData, err := tdx.DecodeGbbqFile(gbbqFile)
+	if err != nil {
+		return fmt.Errorf("failed to decode GBBQ: %w", err)
 	}
 
+	gbbqParquet := filepath.Join(TempDir, "gbbq.parquet")
+	gbbqPw, _ := utils.NewParquetWriter[model.GbbqData](gbbqParquet)
+	if err := gbbqPw.Write(gbbqData); err != nil {
+		return err
+	}
+	gbbqPw.Close()
 	if err := db.ImportGBBQ(gbbqParquet); err != nil {
 		return fmt.Errorf("failed to import GBBQ parquet into database: %w", err)
 	}
 
+	xdxrParquet := filepath.Join(TempDir, "xdxr.parquet")
+	xdxrPw, _ := utils.NewParquetWriter[model.XdxrData](xdxrParquet)
+	if err := xdxrPw.Write(xdxrData); err != nil {
+		return err
+	}
+	xdxrPw.Close()
+	if err := db.ImportXDXR(xdxrParquet); err != nil {
+		return fmt.Errorf("failed to import XDXR parquet into database: %w", err)
+	}
+
 	fmt.Println("📈 股本变迁数据导入成功")
-	return nil
-}
 
-func UpdateFactors(db database.DataRepository) error {
-	parquetPath := filepath.Join(TempDir, "factors.parquet")
+	fmt.Println("📟 计算所有股票复权因子")
+	factorParquet := filepath.Join(TempDir, "factors.parquet")
 
-	fmt.Println("📟 计算所有股票前收盘价")
-	calc.ExportFactorsToParquet(db, parquetPath)
-	if err := db.ImportAdjustFactors(parquetPath); err != nil {
+	if err := calc.ExportFactorsToParquet(db, xdxrData, factorParquet); err != nil {
+		return fmt.Errorf("failed to export factor to parquet: %w", err)
+	}
+	if err := db.ImportAdjustFactors(factorParquet); err != nil {
 		return fmt.Errorf("failed to import factor data: %w", err)
 	}
 	fmt.Println("🔢 复权因子导入成功")

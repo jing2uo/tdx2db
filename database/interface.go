@@ -17,10 +17,10 @@ type DataRepository interface {
 	Import5MinStocks(parquetPath string) error
 	ImportAdjustFactors(parquetPath string) error
 	ImportGBBQ(parquetPath string) error
+	ImportXDXR(parquetPath string) error
 
-	GetLatestDate(tableName string, dateCol string) (time.Time, error)
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
-	GetAllSymbols() ([]string, error)
-	QueryAllXdxr() ([]model.XdxrData, error)
 	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)
+	GetLatestDate(tableName string, dateCol string) (time.Time, error)
+	GetAllSymbols() ([]string, error)
 }

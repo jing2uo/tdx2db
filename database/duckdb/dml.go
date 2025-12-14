@@ -19,6 +19,18 @@ func (d *DuckDBDriver) importParquet(meta *model.TableMeta, parquetPath string) 
 	return err
 }
 
+func (d *DuckDBDriver) truncateTable(meta *model.TableMeta) error {
+
+	query := fmt.Sprintf("TRUNCATE TABLE IF EXISTS %s", meta.TableName)
+
+	_, err := d.db.Exec(query)
+	if err != nil {
+		return fmt.Errorf("duckdb truncate failed: %w", err)
+	}
+
+	return nil
+}
+
 func (d *DuckDBDriver) ImportDailyStocks(path string) error {
 	return d.importParquet(model.TableStocksDaily, path)
 }
@@ -32,10 +44,17 @@ func (d *DuckDBDriver) Import5MinStocks(path string) error {
 }
 
 func (d *DuckDBDriver) ImportGBBQ(path string) error {
+	d.truncateTable(model.TableGbbq)
 	return d.importParquet(model.TableGbbq, path)
 }
 
+func (d *DuckDBDriver) ImportXDXR(path string) error {
+	d.truncateTable(model.TableXdxr)
+	return d.importParquet(model.TableXdxr, path)
+}
+
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
+	d.truncateTable(model.TableAdjustFactor)
 	return d.importParquet(model.TableAdjustFactor, path)
 }
 
@@ -84,25 +103,9 @@ func (d *DuckDBDriver) GetAllSymbols() ([]string, error) {
 	return symbols, nil
 }
 
-func (d *DuckDBDriver) QueryAllXdxr() ([]model.XdxrData, error) {
-	var results []model.XdxrData
-
-	query := fmt.Sprintf(
-		"SELECT * FROM %s ORDER BY code, date",
-		model.ViewXdxr,
-	)
-
-	err := d.db.Select(&results, query)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query xdxr: %w", err)
-	}
-
-	return results, nil
-}
-
 func (d *DuckDBDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
 	query := fmt.Sprintf(
-		"SELECT symbol, open, high, low, close, amount, volume, date FROM %s WHERE symbol = ?",
+		"SELECT symbol, open, high, low, close, date FROM %s WHERE symbol = ? ORDER BY date ASC",
 		model.TableStocksDaily.TableName,
 	)
 

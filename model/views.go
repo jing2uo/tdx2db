@@ -30,7 +30,6 @@ func AllViews() []ViewID {
 // --- 定义视图 ---
 
 var (
-	ViewXdxr     = DefineView("v_xdxr")
 	ViewTurnover = DefineView("v_turnover")
 	ViewDailyQFQ = DefineView("v_qfq_daily")
 	ViewDailyHFQ = DefineView("v_hfq_daily")

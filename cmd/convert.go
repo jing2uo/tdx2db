@@ -22,7 +22,6 @@ const (
 	DayFileDir InputSourceType = iota
 	TicZip
 	DayZip
-	GbbqZip
 	Min1FileDir
 	Min5FileDir
 )
@@ -167,29 +166,6 @@ func Convert(opts ConvertOptions) error {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
 
-		fmt.Printf("🔥 转换完成: %s\n", output)
-
-	case GbbqZip:
-		fmt.Printf("📦 开始处理股本变迁压缩文件: %s\n", opts.InputPath)
-		if err := utils.CheckFile(opts.InputPath); err != nil {
-			return err
-
-		}
-		unzipDestPath := filepath.Join(VipdocDir, "gbbq-temp")
-		if err := os.MkdirAll(unzipDestPath, 0755); err != nil {
-			return fmt.Errorf("failed to create unzip destination directory: %w", err)
-		}
-		if err := utils.UnzipFile(opts.InputPath, unzipDestPath); err != nil {
-			return fmt.Errorf("failed to unzip file %s: %w", opts.InputPath, err)
-		}
-
-		gbbq := filepath.Join(unzipDestPath, "gbbq")
-		output := filepath.Join(opts.OutputPath, "tdx2db_gbbq.parquet")
-		fmt.Printf("🐢 开始转换股本变迁数据\n")
-		_, err := tdx.ConvertGbbqFileToParquet(gbbq, output)
-		if err != nil {
-			return fmt.Errorf("failed to convert gbbq file: %w", err)
-		}
 		fmt.Printf("🔥 转换完成: %s\n", output)
 	}
 
