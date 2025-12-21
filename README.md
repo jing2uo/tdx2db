@@ -116,7 +116,7 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 **注意**
 
 1. 分时数据下载和导入耗时，表数据量大
-2. 通达信没提供历史分时数据，请自行检索后使用 duckdb 导入
+2. 通达信没提供历史分时数据，请自行检索后导入对应表
 3. 更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
@@ -124,38 +124,27 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 
 raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
 
-| 表/视图名           | 说明         |
-| :------------------ | :----------- |
-| `raw_stocks_daily`  | 股票日线数据 |
-| `raw_stocks_1min`   | 1 分钟 K 线  |
-| `raw_stocks_5min`   | 5 分钟 K 线  |
-| `raw_adjust_factor` | 复权因子表   |
-| `v_xdxr`            | 除权除息记录 |
-| `v_turnover`        | 换手率与市值 |
-| `v_qfq_*`           | 前复权数据   |
-| `v_hfq_*`           | 后复权数据   |
+| 表/视图名           | 说明                   |
+| :------------------ | :--------------------- |
+| `raw_stocks_daily`  | 股票日线数据           |
+| `raw_stocks_1min`   | 1 分钟 K 线            |
+| `raw_stocks_5min`   | 5 分钟 K 线            |
+| `raw_stocks_basic`  | 前收盘价、换手率与市值 |
+| `raw_adjust_factor` | 复权因子表             |
+| `v_qfq_daily`       | 前复权日线数据         |
+| `v_hfq_daily`       | 后复权日线数据         |
 
-复权数据：
+复权数据，默认创建日线前后复权视图，如需分时参考 v_qfq_daily 调整即可：
 
 ```sql
 # 前复权
 select * from v_qfq_daily where symbol='sz000001' order by date;
-select * from v_qfq_5min where symbol='sz000001' order by date;
 
 # 后复权
 select * from v_hfq_daily where symbol='sz000001' order by date;
-select * from v_hfq_5min where symbol='sz000001' order by date;
 ```
 
-前收盘价和复权因子，可以根据前收盘价拓展其他复权算法：
-
-```sql
-select * from raw_adjust_factor where symbol='sz000001';
-```
-
-算法来自 QUANTAXIS，原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L)
-
-复权结果和 QUANTAXIS、通达信等比复权一致；其中前复权结果和雪球、新浪也一致。
+复权算法来自 QUANTAXIS，原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L)，复权结果和 QUANTAXIS、通达信等比复权一致；其中前复权结果和雪球、新浪也一致。
 
 ## 通达信数据转 CSV
 
