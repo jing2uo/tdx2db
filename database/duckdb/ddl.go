@@ -45,101 +45,45 @@ func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *DuckDBDriver) registerViews() {
-	// 换手率与市值视图 (ViewTurnover)
-	d.viewImpls[model.ViewTurnover] = func() error {
+	// 通用创建复权视图函数
+	createAdjustView := func(viewName model.ViewID, factorCol string) error {
+		// 组装 SQL
 		query := fmt.Sprintf(`
-			CREATE OR REPLACE VIEW %s AS
-			WITH gbbq_sorted AS (
-				SELECT
-					date,
-					symbol,
-					post_float,
-					post_total
-				FROM %s
-				WHERE category IN (2, 3, 5, 7, 8, 9, 10)
-				ORDER BY symbol, date -- ASOF JOIN 要求右表必须排序
-			)
-			SELECT
-				r.date,
-				r.symbol,
-				CASE WHEN g.post_float > 0 THEN
-					ROUND(r.volume / (g.post_float * 10000), 6)
-				ELSE 0 END AS turnover,
-				ROUND(g.post_float * 10000 * r.close, 2) AS float_mv,
-				ROUND(g.post_total * 10000 * r.close, 2) AS total_mv
-			FROM %s r
-			ASOF JOIN gbbq_sorted g
-				ON r.symbol = g.symbol
-				AND r.date >= g.date            -- 时间对齐 (找最近的股本)
-		`,
-			model.ViewTurnover,
-			model.TableGbbq.TableName,
-			model.TableStocksDaily.TableName)
-		_, err := d.db.Exec(query)
-		return err
-	}
-
-	// 通用复权视图构建函数
-	createAdjustView := func(viewName model.ViewID, sourceTable string, factorCol string, isMin bool) error {
-		var joinClause string
-		timeCol := "date"
-
-		if isMin {
-			timeCol = "datetime"
-			joinClause = fmt.Sprintf(`
-				ASOF JOIN (SELECT * FROM %s ORDER BY symbol, date) f
-				ON s.symbol = f.symbol AND s.datetime >= CAST(f.date AS TIMESTAMP)
-			`, model.TableAdjustFactor.TableName)
-
-		} else {
-			// --- 日线逻辑 ---
-			joinClause = fmt.Sprintf("LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date", model.TableAdjustFactor.TableName)
-		}
-
-		query := fmt.Sprintf(`
-			CREATE OR REPLACE VIEW %s AS
-			SELECT
-				s.symbol,
-				s.%s, -- date or datetime
-				s.volume,
-				s.amount,
-				ROUND(s.open  * f.%s, 2) AS open,
-				ROUND(s.high  * f.%s, 2) AS high,
-				ROUND(s.low   * f.%s, 2) AS low,
-				ROUND(s.close * f.%s, 2) AS close
-			FROM %s s
-			%s -- Factor Join (Standard or ASOF)
-		`,
+            CREATE OR REPLACE VIEW %s AS
+            SELECT
+                s.date,
+                s.symbol,
+                ROUND(s.open  * f.%s, 2) AS open,
+                ROUND(s.high  * f.%s, 2) AS high,
+                ROUND(s.low   * f.%s, 2) AS low,
+                ROUND(s.close * f.%s, 2) AS close,
+                b.preclose,
+                s.volume,
+                s.amount,
+                b.turnover,
+                b.floatmv,
+                b.totalmv
+            FROM %s s
+            LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+            LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+        `,
 			viewName,
-			timeCol,
 			factorCol, factorCol, factorCol, factorCol,
-			sourceTable,
-			joinClause,
+			model.TableStocksDaily.TableName,
+			model.TableAdjustFactor.TableName,
+			model.TableBasic.TableName,
 		)
 
 		_, err := d.db.Exec(query)
 		return err
 	}
 
-	// 3. 注册日线复权
+	// 注册各个视图
 	d.viewImpls[model.ViewDailyQFQ] = func() error {
-		return createAdjustView(model.ViewDailyQFQ, model.TableStocksDaily.TableName, "qfq_factor", false)
-	}
-	d.viewImpls[model.ViewDailyHFQ] = func() error {
-		return createAdjustView(model.ViewDailyHFQ, model.TableStocksDaily.TableName, "hfq_factor", false)
+		return createAdjustView(model.ViewDailyQFQ, "qfq_factor")
 	}
 
-	// 4. 注册分钟线复权
-	d.viewImpls[model.View1MinQFQ] = func() error {
-		return createAdjustView(model.View1MinQFQ, model.TableStocks1Min.TableName, "qfq_factor", true)
-	}
-	d.viewImpls[model.View1MinHFQ] = func() error {
-		return createAdjustView(model.View1MinHFQ, model.TableStocks1Min.TableName, "hfq_factor", true)
-	}
-	d.viewImpls[model.View5MinQFQ] = func() error {
-		return createAdjustView(model.View5MinQFQ, model.TableStocks5Min.TableName, "qfq_factor", true)
-	}
-	d.viewImpls[model.View5MinHFQ] = func() error {
-		return createAdjustView(model.View5MinHFQ, model.TableStocks5Min.TableName, "hfq_factor", true)
+	d.viewImpls[model.ViewDailyHFQ] = func() error {
+		return createAdjustView(model.ViewDailyHFQ, "hfq_factor")
 	}
 }

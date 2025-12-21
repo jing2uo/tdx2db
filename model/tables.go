@@ -102,61 +102,9 @@ func SchemaFromStruct(tableName string, model interface{}, orderByKey []string) 
 		OrderByKey: orderByKey,
 	}
 
-	// === 核心改动：自动注册 ===
 	registerTable(meta)
 
 	return meta
-}
-
-// --- 结构体定义 (Schema) ---
-type StockData struct {
-	Symbol string    `col:"symbol"`
-	Open   float64   `col:"open"`
-	High   float64   `col:"high"`
-	Low    float64   `col:"low"`
-	Close  float64   `col:"close"`
-	Amount float64   `col:"amount"`
-	Volume int64     `col:"volume"`
-	Date   time.Time `col:"date" type:"date"`
-}
-
-type StockMinData struct {
-	Symbol   string    `col:"symbol"`
-	Open     float64   `col:"open"`
-	High     float64   `col:"high"`
-	Low      float64   `col:"low"`
-	Close    float64   `col:"close"`
-	Amount   float64   `col:"amount"`
-	Volume   int64     `col:"volume"`
-	Datetime time.Time `col:"datetime" type:"datetime" `
-}
-
-type Factor struct {
-	Symbol    string    `col:"symbol"`
-	Date      time.Time `col:"date" type:"date"`
-	Close     float64   `col:"close"`
-	PreClose  float64   `col:"pre_close"`
-	QfqFactor float64   `col:"qfq_factor"`
-	HfqFactor float64   `col:"hfq_factor"`
-}
-
-type GbbqData struct {
-	Category  int       `col:"category"`
-	Symbol    string    `col:"symbol"`
-	Date      time.Time `col:"date" type:"date"`
-	PreFloat  float64   `col:"pre_float"`
-	PreTotal  float64   `col:"pre_total"`
-	PostFloat float64   `col:"post_float"`
-	PostTotal float64   `col:"post_total"`
-}
-
-type XdxrData struct {
-	Symbol      string    `col:"symbol"`
-	Date        time.Time `col:"date" type:"date"`
-	Fenhong     float64   `col:"fenhong"`
-	Peigujia    float64   `col:"peigujia"`
-	Songzhuangu float64   `col:"songzhuangu"`
-	Peigu       float64   `col:"peigu"`
 }
 
 // --- 表结构元数据 (TableMeta) ---
@@ -191,8 +139,8 @@ var TableGbbq = SchemaFromStruct(
 	[]string{"symbol", "date"},
 )
 
-var TableXdxr = SchemaFromStruct(
-	"raw_xdxr",
-	XdxrData{},
+var TableBasic = SchemaFromStruct(
+	"raw_stocks_basic",
+	StockBasic{},
 	[]string{"symbol", "date"},
 )

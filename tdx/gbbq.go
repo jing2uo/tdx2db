@@ -12,28 +12,26 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
-func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, []model.XdxrData, error) {
+func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 	hexStr := strings.ReplaceAll(HexKeys, " ", "")
 	keys, err := hex.DecodeString(hexStr)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode hex keys: %w", err)
+		return nil, fmt.Errorf("failed to decode hex keys: %w", err)
 	}
 
 	content, err := os.ReadFile(gbbqFile)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read GBBQ file: %w", err)
+		return nil, fmt.Errorf("failed to read GBBQ file: %w", err)
 	}
 
 	if len(content) < 4 {
-		return nil, nil, nil
+		return nil, nil
 	}
 
 	// 读取记录数量
 	count := int(binary.LittleEndian.Uint32(content[0:4]))
 
-	// 预分配切片，虽然无法精确知道两类数据的比例，但可以先给一定的容量避免频繁扩容
 	gbbqResult := make([]model.GbbqData, 0, count)
-	xdxrResult := make([]model.XdxrData, 0, count)
 
 	pos := 4
 	var clearData [29]byte
@@ -90,31 +88,18 @@ func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, []model.XdxrData, error)
 		// 4. Category 分类处理
 		category := int(clearData[12])
 
-		if category == 1 {
-			// 除权除息数据
-			xdxrResult = append(xdxrResult, model.XdxrData{
-				Symbol:      symbol,
-				Date:        dateTime,
-				Fenhong:     c1,
-				Peigujia:    c2,
-				Songzhuangu: c3,
-				Peigu:       c4,
-			})
-		} else {
-			// 股本变动数据
-			gbbqResult = append(gbbqResult, model.GbbqData{
-				Category:  category,
-				Symbol:    symbol,
-				Date:      dateTime,
-				PreFloat:  c1,
-				PreTotal:  c2,
-				PostFloat: c3,
-				PostTotal: c4,
-			})
-		}
+		gbbqResult = append(gbbqResult, model.GbbqData{
+			Category: category,
+			Symbol:   symbol,
+			Date:     dateTime,
+			C1:       c1,
+			C2:       c2,
+			C3:       c3,
+			C4:       c4,
+		})
 	}
 
-	return gbbqResult, xdxrResult, nil
+	return gbbqResult, nil
 }
 
 // fastParseDate 将 YYYYMMDD 整数转为 time.Time，比字符串解析快 100 倍
