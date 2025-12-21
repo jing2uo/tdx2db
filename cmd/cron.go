@@ -23,6 +23,11 @@ func Cron(dbURI string, minline string) error {
 	if err := db.Connect(); err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
+
+	if err := db.InitSchema(); err != nil {
+		return fmt.Errorf("failed to initialize schema: %w", err)
+	}
+
 	defer db.Close()
 
 	err = UpdateStocksDaily(db)
@@ -182,7 +187,7 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 		return fmt.Errorf("failed to download GBBQ file: %w", err)
 	}
 
-	gbbqData, xdxrData, err := tdx.DecodeGbbqFile(gbbqFile)
+	gbbqData, err := tdx.DecodeGbbqFile(gbbqFile)
 	if err != nil {
 		return fmt.Errorf("failed to decode GBBQ: %w", err)
 	}
@@ -197,22 +202,29 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 		return fmt.Errorf("failed to import GBBQ csv into database: %w", err)
 	}
 
-	xdxrCSV := filepath.Join(TempDir, "xdxr.csv")
-	xdxrCw, _ := utils.NewCSVWriter[model.XdxrData](xdxrCSV)
-	if err := xdxrCw.Write(xdxrData); err != nil {
-		return err
-	}
-	xdxrCw.Close()
-	if err := db.ImportXDXR(xdxrCSV); err != nil {
-		return fmt.Errorf("failed to import XDXR csv into database: %w", err)
-	}
-
 	fmt.Println("📈 股本变迁数据导入成功")
 
-	fmt.Println("📟 计算所有股票复权因子")
-	factorCSV := filepath.Join(TempDir, "factors.csv")
+	fmt.Println("📟 计算所有股票基础行情")
+	basicCSV := filepath.Join(TempDir, "basics.csv")
 
-	if err := calc.ExportFactorsToCSV(db, xdxrData, factorCSV); err != nil {
+	rowCount, err := calc.ExportStockBasicToCSV(db, gbbqData, basicCSV)
+	if err != nil {
+		return fmt.Errorf("failed to export basic to csv: %w", err)
+	}
+
+	if rowCount == 0 {
+		fmt.Println("🌲 股票基础行情无需更新")
+	} else {
+		if err := db.ImportBasic(basicCSV); err != nil {
+			return fmt.Errorf("failed to import basic data: %w", err)
+		}
+		fmt.Println("🔢 基础行情导入成功")
+	}
+
+	fmt.Println("📟 计算所有股票复权因子")
+	factorCSV := filepath.Join(TempDir, "factor.csv")
+
+	if err := calc.ExportFactorsToCSV(db, factorCSV); err != nil {
 		return fmt.Errorf("failed to export factor to csv: %w", err)
 	}
 	if err := db.ImportAdjustFactors(factorCSV); err != nil {

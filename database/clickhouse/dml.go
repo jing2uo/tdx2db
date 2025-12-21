@@ -90,9 +90,8 @@ func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 	return d.importCSV(model.TableGbbq, path)
 }
 
-func (d *ClickHouseDriver) ImportXDXR(path string) error {
-	d.truncateTable(model.TableXdxr)
-	return d.importCSV(model.TableXdxr, path)
+func (d *ClickHouseDriver) ImportBasic(path string) error {
+	return d.importCSV(model.TableBasic, path)
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
@@ -143,26 +142,72 @@ func (d *ClickHouseDriver) GetAllSymbols() ([]string, error) {
 }
 
 func (d *ClickHouseDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
-	query := fmt.Sprintf(
-		"SELECT symbol, open, high, low, close, date FROM %s WHERE symbol = ? ORDER BY date ASC",
-		model.TableStocksDaily.TableName,
-	)
 
+	conditions := []string{"symbol = ?"}
 	args := []interface{}{symbol}
 
 	if startDate != nil {
-		query += " AND date >= ?"
+		conditions = append(conditions, "date >= ?")
 		args = append(args, *startDate)
 	}
 	if endDate != nil {
-		query += " AND date <= ?"
+		conditions = append(conditions, "date <= ?")
 		args = append(args, *endDate)
 	}
 
+	query := fmt.Sprintf(
+		`SELECT * FROM %s WHERE %s ORDER BY date ASC`,
+		model.TableStocksDaily.TableName,
+		strings.Join(conditions, " AND "),
+	)
+
 	var results []model.StockData
-	err := d.db.Select(&results, query, args...)
-	if err != nil {
+	if err := d.db.Select(&results, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to query stocks: %w", err)
+	}
+
+	return results, nil
+}
+
+func (d *ClickHouseDriver) GetBasicsBySymbol(symbol string) ([]model.StockBasic, error) {
+	query := fmt.Sprintf(
+		"SELECT * FROM %s WHERE symbol = ? ORDER BY date",
+		model.TableBasic.TableName,
+	)
+
+	var results []model.StockBasic
+	if err := d.db.Select(&results, query, symbol); err != nil {
+		return nil, fmt.Errorf("failed to query daily basics by symbol %s: %w", symbol, err)
+	}
+
+	return results, nil
+}
+
+func (d *ClickHouseDriver) GetLatestBasicBySymbol(symbol string) ([]model.StockBasic, error) {
+	query := fmt.Sprintf(
+		"SELECT * FROM %s WHERE symbol = ? ORDER BY date DESC LIMIT 1",
+		model.TableBasic.TableName,
+	)
+
+	var results []model.StockBasic
+	if err := d.db.Select(&results, query, symbol); err != nil {
+		return nil, fmt.Errorf("failed to query latest daily basic by symbol %s: %w", symbol, err)
+	}
+
+	return results, nil
+}
+
+func (d *ClickHouseDriver) GetLatestBasics() ([]model.StockBasic, error) {
+	table := model.TableBasic.TableName
+
+	query := fmt.Sprintf(
+		`SELECT * FROM %s WHERE date = (SELECT max(date) FROM %s) ORDER BY symbol`,
+		table, table,
+	)
+
+	var results []model.StockBasic
+	if err := d.db.Select(&results, query); err != nil {
+		return nil, fmt.Errorf("failed to query latest daily basics: %w", err)
 	}
 
 	return results, nil
