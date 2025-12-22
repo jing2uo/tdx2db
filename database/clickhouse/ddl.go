@@ -75,27 +75,46 @@ func (d *ClickHouseDriver) registerViews() {
 	// 通用创建复权视图函数
 	createAdjustView := func(viewName model.ViewID, factorCol string) error {
 		// 组装 SQL
+		priceFactor := "1"
+		if factorCol != "" {
+			priceFactor = "f." + factorCol
+		}
+
+		factorSelect := ""
+		switch factorCol {
+		case "qfq_factor":
+			factorSelect = "f.qfq_factor AS qfq_factor"
+		case "hfq_factor":
+			factorSelect = "f.hfq_factor AS hfq_factor"
+		default:
+			factorSelect = `
+                f.qfq_factor AS qfq_factor,
+                f.hfq_factor AS hfq_factor`
+		}
+
 		query := fmt.Sprintf(`
             CREATE OR REPLACE VIEW %s AS
             SELECT
-                s.date   AS date,
                 s.symbol AS symbol,
-                ROUND(s.open  * f.%s, 2) AS open,
-                ROUND(s.high  * f.%s, 2) AS high,
-                ROUND(s.low   * f.%s, 2) AS low,
-                ROUND(s.close * f.%s, 2) AS close,
-                b.preclose AS preclose,
-                s.volume   AS volume,
-                s.amount   AS amount,
-                b.turnover AS turnover,
-                b.floatmv  AS floatmv,
-                b.totalmv  AS totalmv
+                s.date   AS date,
+                ROUND(s.open  * %s, 2) AS open,
+                ROUND(s.high  * %s, 2) AS high,
+                ROUND(s.low   * %s, 2) AS low,
+                ROUND(s.close * %s, 2) AS close,
+                b.preclose   AS preclose,
+                s.volume     AS volume,
+                s.amount     AS amount,
+                b.turnover   AS turnover,
+                b.floatmv    AS floatmv,
+                b.totalmv    AS totalmv,
+				%s
             FROM %s s
             LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
             LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
         `,
 			viewName,
-			factorCol, factorCol, factorCol, factorCol,
+			priceFactor, priceFactor, priceFactor, priceFactor,
+			factorSelect,
 			model.TableStocksDaily.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
@@ -106,6 +125,10 @@ func (d *ClickHouseDriver) registerViews() {
 	}
 
 	// 注册各个视图
+	d.viewImpls[model.ViewDailyBFQ] = func() error {
+		return createAdjustView(model.ViewDailyBFQ, "")
+	}
+
 	d.viewImpls[model.ViewDailyQFQ] = func() error {
 		return createAdjustView(model.ViewDailyQFQ, "qfq_factor")
 	}
