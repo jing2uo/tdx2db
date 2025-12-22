@@ -115,15 +115,12 @@ func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}
 }
 
 func (d *ClickHouseDriver) GetLatestDate(tableName string, dateCol string) (time.Time, error) {
-	// 性能优化：利用索引快速获取最大时间
-	query := fmt.Sprintf("SELECT max(%s) AS latest FROM %s", dateCol, tableName)
-
+	query := fmt.Sprintf("SELECT maxOrNull(%s) AS latest FROM %s", dateCol, tableName)
 	var latest sql.NullTime
 	err := d.db.Get(&latest, query)
 	if err != nil {
 		return time.Time{}, err
 	}
-
 	if !latest.Valid {
 		return time.Time{}, nil
 	}
