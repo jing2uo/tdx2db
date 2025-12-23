@@ -88,7 +88,7 @@ func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, de
 }
 
 func (d *DuckDBDriver) GetLatestDate(tableName string, dateCol string) (time.Time, error) {
-	query := fmt.Sprintf("SELECT max(%s) AS latest FROM %s", dateCol, tableName)
+	query := fmt.Sprintf("SELECT DATE(max(%s)) AS latest FROM %s", dateCol, tableName)
 
 	var latest sql.NullTime
 	err := d.db.Get(&latest, query)

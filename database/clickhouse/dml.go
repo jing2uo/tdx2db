@@ -115,7 +115,7 @@ func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}
 }
 
 func (d *ClickHouseDriver) GetLatestDate(tableName string, dateCol string) (time.Time, error) {
-	query := fmt.Sprintf("SELECT maxOrNull(%s) AS latest FROM %s", dateCol, tableName)
+	query := fmt.Sprintf("SELECT toDate(maxOrNull(%s)) AS latest FROM %s", dateCol, tableName)
 	var latest sql.NullTime
 	err := d.db.Get(&latest, query)
 	if err != nil {
