@@ -161,6 +161,18 @@ func processStockBasic(
 	// C. 获取 GBBQ 数据
 	gbbqs := getGbbqBySymbol(gbbqIndex, symbol)
 
+	if isIncremental {
+		var filtered []model.GbbqData
+		for _, g := range gbbqs {
+			// 只保留除权日期 > startDate 的记录
+			// startDate 及之前的除权都已经在历史计算中处理过了
+			if g.Date.After(startDate) {
+				filtered = append(filtered, g)
+			}
+		}
+		gbbqs = filtered
+	}
+
 	// D. 准备初始状态
 	var initState *IncrementState
 
