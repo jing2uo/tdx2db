@@ -18,7 +18,12 @@ type DataRepository interface {
 	ImportAdjustFactors(csvPath string) error
 	ImportGBBQ(csvPath string) error
 	ImportBasic(csvPath string) error
+	ImportStocksInfo(csvPath string) error
+	ImportHolidays(csvPath string) error
+	ImportBlocksInfo(csvPath string) error
+	ImportBlocksMember(csvPath string) error
 
+	TruncateTable(meta *model.TableMeta) error
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
 	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)

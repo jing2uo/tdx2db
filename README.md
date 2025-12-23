@@ -18,7 +18,7 @@
 
 ## 声明
 
-- 代码不会向后兼容且会写出 bug，用于实盘前请谨慎检查数据正确性，不对你的损失负责。
+- 代码不会兼容历史版本且会写出 bug，请谨慎检查数据正确性，不对你的损失负责。
 - 如果导入了分时请保留原始数据并定期备份，数据更新出问题日线可以快速还原，分时很麻烦。
 
 ## 安装说明
@@ -99,7 +99,7 @@ docker run --rm --platform=linux/amd64 -v "${PWD}:/data" \
 
 cron 命令会更新股票数据、股本变迁数据到最新日期，并计算前收盘价和复权因子。
 
-初次使用时，请在 init 后立刻执行一次 cron，以获得复权相关数据。
+初次使用时，请在 init 后立刻执行一次 cron。
 
 ```bash
 tdx2db cron --dburi 'duckdb://tdx.db'    # ClickHouse schema 参考 init 部分
@@ -111,7 +111,7 @@ tdx2db cron --dburi 'duckdb://tdx.db'    # ClickHouse schema 参考 init 部分
 
 ### 分时数据
 
-cron 命令支持 1min 和 5min 分时数据导入
+cron 命令支持 1min 和 5min 分时数据导入。
 
 ```bash
 # --minline 可选 1、5、1,5 ，分别表示只处理1分钟、只处理5分钟、两种都处理
@@ -125,19 +125,33 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 3. 更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
+### 拓展数据
+
+cron 命令支持导入通达信概念、风格、行业成分，也处理股票名称和假期。
+
+```bash
+# tdxhome 表示通达信安装目录，可以和 --minline 共用
+tdx2db cron --dburi 'duckdb://tdx.db' --tdxhome ~/new_tdx
+```
+
 ### 表查询
 
-raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图
+raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 
-| 表/视图名           | 说明                   |
-| :------------------ | :--------------------- |
-| `raw_stocks_daily`  | 股票日线数据           |
-| `raw_stocks_1min`   | 1 分钟 K 线            |
-| `raw_stocks_5min`   | 5 分钟 K 线            |
-| `raw_stocks_basic`  | 前收盘价、换手率与市值 |
-| `raw_adjust_factor` | 复权因子表             |
-| `v_qfq_daily`       | 前复权日线数据         |
-| `v_hfq_daily`       | 后复权日线数据         |
+| 表/视图名               | 说明                          |
+| :---------------------- | :---------------------------- |
+| `raw_adjust_factor`     | 复权因子表                    |
+| `raw_holidays`          | 假期日历                      |
+| `raw_stocks_1min`       | 1 分钟 K 线                   |
+| `raw_stocks_5min`       | 5 分钟 K 线                   |
+| `raw_stocks_basic`      | 前收盘价、换手率与市值        |
+| `raw_stocks_daily`      | 股票日线数据                  |
+| `raw_stocks_info`       | 股票代码和名称                |
+| `raw_tdx_blocks_info`   | 概念、风格、行业板块信息      |
+| `raw_tdx_blocks_member` | 板块成分                      |
+| `v_bfq_daily`           | 不复权日线，包含 stocks_basic |
+| `v_qfq_daily`           | 前复权日线数据                |
+| `v_hfq_daily`           | 后复权日线数据                |
 
 复权数据，默认创建日线前后复权视图，如需分时参考 v_qfq_daily 调整即可：
 

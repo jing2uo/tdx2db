@@ -12,6 +12,7 @@ import (
 	_ "github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/jing2uo/tdx2db/model"
 	"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx/reflectx"
 )
 
 type ClickHouseDriver struct {
@@ -137,6 +138,8 @@ func (d *ClickHouseDriver) Connect() error {
 	db.SetMaxOpenConns(20)
 	db.SetMaxIdleConns(5)
 	db.SetConnMaxLifetime(0)
+
+	db.Mapper = reflectx.NewMapperFunc("col", strings.ToLower)
 
 	if err := db.Ping(); err != nil {
 		return fmt.Errorf("clickhouse ping failed: %w", err)

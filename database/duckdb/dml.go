@@ -32,7 +32,7 @@ func (d *DuckDBDriver) importCSV(meta *model.TableMeta, csvPath string) error {
 	return err
 }
 
-func (d *DuckDBDriver) truncateTable(meta *model.TableMeta) error {
+func (d *DuckDBDriver) TruncateTable(meta *model.TableMeta) error {
 
 	query := fmt.Sprintf("DELETE FROM %s", meta.TableName)
 
@@ -57,7 +57,7 @@ func (d *DuckDBDriver) Import5MinStocks(path string) error {
 }
 
 func (d *DuckDBDriver) ImportGBBQ(path string) error {
-	d.truncateTable(model.TableGbbq)
+	d.TruncateTable(model.TableGbbq)
 	return d.importCSV(model.TableGbbq, path)
 }
 
@@ -66,8 +66,27 @@ func (d *DuckDBDriver) ImportBasic(path string) error {
 }
 
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
-	d.truncateTable(model.TableAdjustFactor)
+	d.TruncateTable(model.TableAdjustFactor)
 	return d.importCSV(model.TableAdjustFactor, path)
+}
+
+func (d *DuckDBDriver) ImportStocksInfo(path string) error {
+	d.TruncateTable(model.TableStockInfo)
+	return d.importCSV(model.TableStockInfo, path)
+}
+
+func (d *DuckDBDriver) ImportHolidays(path string) error {
+	d.TruncateTable(model.TableHoliday)
+	return d.importCSV(model.TableHoliday, path)
+}
+
+func (d *DuckDBDriver) ImportBlocksInfo(path string) error {
+	d.TruncateTable(model.TableBlockInfo)
+	return d.importCSV(model.TableBlockInfo, path)
+}
+
+func (d *DuckDBDriver) ImportBlocksMember(path string) error {
+	return d.importCSV(model.TableBlockMember, path)
 }
 
 func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

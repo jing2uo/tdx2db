@@ -14,7 +14,7 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-func Cron(dbURI string, minline string) error {
+func Cron(dbURI, minline, tdxhome string) error {
 	db, err := database.NewDB(dbURI)
 	if err != nil {
 		return fmt.Errorf("failed to create database driver: %w", err)
@@ -44,6 +44,12 @@ func Cron(dbURI string, minline string) error {
 	if err != nil {
 		return fmt.Errorf("failed to update GBBQ: %w", err)
 	}
+
+	err = UpdateTdxBlocksInfo(db, tdxhome)
+	if err != nil {
+		return fmt.Errorf("failed to update tdx blocks info: %w", err)
+	}
+
 	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
@@ -232,6 +238,37 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 	}
 	fmt.Println("🔢 复权因子导入成功")
 
+	return nil
+}
+
+func UpdateTdxBlocksInfo(db database.DataRepository, tdxHome string) error {
+	if tdxHome == "" {
+		return nil
+	}
+
+	fmt.Printf("🐢 导入通达信概念行业等信息\n")
+	result, err := tdx.ExportTdxBlocksDataToCSV(tdxHome, TempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "🚨 警告: %v\n", err)
+		return nil
+	}
+
+	if result.StockInfoFile != "" {
+		db.ImportStocksInfo(result.StockInfoFile)
+	}
+	if result.HolidaysFile != "" {
+		db.ImportHolidays(result.HolidaysFile)
+	}
+	if result.BlockInfoFile != "" {
+		db.ImportBlocksInfo(result.BlockInfoFile)
+	}
+	if result.BlockMembersConceptFile != "" {
+		db.TruncateTable(model.TableBlockMember)
+		db.ImportBlocksMember(result.BlockMembersConceptFile)
+	}
+	if result.BlockMembersIndustryFile != "" {
+		db.ImportBlocksMember(result.BlockMembersIndustryFile)
+	}
 	return nil
 }
 

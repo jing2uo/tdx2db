@@ -50,3 +50,26 @@ type GbbqData struct {
 	C3       float64   `col:"c3"`
 	C4       float64   `col:"c4"`
 }
+
+type Holiday struct {
+	Date time.Time `col:"date" type:"date"`
+}
+
+type StockInfo struct {
+	Symbol string `col:"symbol"`
+	Name   string `col:"name"`
+}
+
+type BlockMember struct {
+	StockSymbol string `col:"stock_symbol"`
+	BlockCode   string `col:"block_code"`
+}
+
+type BlockInfo struct {
+	BlockType   string `col:"block_type"`
+	BlockName   string `col:"block_name"`
+	BlockSymbol string `col:"block_symbol"`
+	BlockCode   string `col:"block_code"`
+	ParentCode  string `col:"parent_code"`
+	BlockLevel  int    `col:"block_level"`
+}

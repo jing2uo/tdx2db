@@ -7,6 +7,7 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.5.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/spf13/cobra v1.10.1
+	golang.org/x/text v0.28.0
 )
 
 require (

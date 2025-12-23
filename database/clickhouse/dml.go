@@ -59,7 +59,7 @@ func (d *ClickHouseDriver) importCSV(meta *model.TableMeta, filePath string) err
 	return nil
 }
 
-func (d *ClickHouseDriver) truncateTable(meta *model.TableMeta) error {
+func (d *ClickHouseDriver) TruncateTable(meta *model.TableMeta) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
@@ -86,7 +86,7 @@ func (d *ClickHouseDriver) Import5MinStocks(path string) error {
 }
 
 func (d *ClickHouseDriver) ImportGBBQ(path string) error {
-	d.truncateTable(model.TableGbbq)
+	d.TruncateTable(model.TableGbbq)
 	return d.importCSV(model.TableGbbq, path)
 }
 
@@ -95,8 +95,27 @@ func (d *ClickHouseDriver) ImportBasic(path string) error {
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
-	d.truncateTable(model.TableAdjustFactor)
+	d.TruncateTable(model.TableAdjustFactor)
 	return d.importCSV(model.TableAdjustFactor, path)
+}
+
+func (d *ClickHouseDriver) ImportStocksInfo(path string) error {
+	d.TruncateTable(model.TableStockInfo)
+	return d.importCSV(model.TableStockInfo, path)
+}
+
+func (d *ClickHouseDriver) ImportHolidays(path string) error {
+	d.TruncateTable(model.TableHoliday)
+	return d.importCSV(model.TableHoliday, path)
+}
+
+func (d *ClickHouseDriver) ImportBlocksInfo(path string) error {
+	d.TruncateTable(model.TableBlockInfo)
+	return d.importCSV(model.TableBlockInfo, path)
+}
+
+func (d *ClickHouseDriver) ImportBlocksMember(path string) error {
+	return d.importCSV(model.TableBlockMember, path)
 }
 
 func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

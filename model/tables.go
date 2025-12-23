@@ -144,3 +144,27 @@ var TableBasic = SchemaFromStruct(
 	StockBasic{},
 	[]string{"symbol", "date"},
 )
+
+var TableStockInfo = SchemaFromStruct(
+	"raw_stocks_info",
+	StockInfo{},
+	[]string{""},
+)
+
+var TableHoliday = SchemaFromStruct(
+	"raw_holidays",
+	Holiday{},
+	[]string{""},
+)
+
+var TableBlockInfo = SchemaFromStruct(
+	"raw_tdx_blocks_info",
+	BlockInfo{},
+	[]string{""},
+)
+
+var TableBlockMember = SchemaFromStruct(
+	"raw_tdx_blocks_member",
+	BlockMember{},
+	[]string{""},
+)
