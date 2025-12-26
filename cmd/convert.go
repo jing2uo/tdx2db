@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -35,7 +36,8 @@ func isDirType(t InputSourceType) bool {
 	}
 }
 
-func Convert(opts ConvertOptions) error {
+// Convert 转换 TDX 数据到 CSV
+func Convert(ctx context.Context, opts ConvertOptions) error {
 	if opts.InputPath == "" {
 		return errors.New("input path cannot be empty")
 	}
@@ -55,6 +57,13 @@ func Convert(opts ConvertOptions) error {
 		if err := utils.CheckFile(opts.InputPath); err != nil {
 			return err
 		}
+	}
+
+	// 检查取消
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	dataDir := TempDir
@@ -78,7 +87,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
 
 		fmt.Println("🐢 开始转换日线数据")
-		_, err := tdx.ConvertFilesToCSV(opts.InputPath, allPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, allPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -90,7 +99,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
 
 		fmt.Println("🐢 开始转换 1 分钟数据")
-		_, err := tdx.ConvertFilesToCSV(opts.InputPath, stocksPrefixes, output, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, stocksPrefixes, output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
 		}
@@ -102,7 +111,7 @@ func Convert(opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
 
 		fmt.Println("🐢 开始转换 5 分钟数据")
-		_, err := tdx.ConvertFilesToCSV(opts.InputPath, stocksPrefixes, output, ".5")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, stocksPrefixes, output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
 		}
@@ -123,11 +132,18 @@ func Convert(opts ConvertOptions) error {
 			return fmt.Errorf("failed to unzip file %s: %w", opts.InputPath, err)
 		}
 
+		// 检查取消
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		fmt.Printf("🐢 开始转档分笔数据\n")
-		if err := tdx.DatatoolCreate(dataDir, "tick", Today); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "tick", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolTickCreate: %w", err)
 		}
-		if err := tdx.DatatoolCreate(dataDir, "min", Today); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "min", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolMinCreate: %w", err)
 		}
 
@@ -135,13 +151,20 @@ func Convert(opts ConvertOptions) error {
 		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
 		fmt.Printf("🐢 开始转换 1 分钟数据\n")
-		_, err := tdx.ConvertFilesToCSV(VipdocDir, stocksPrefixes, min1_output, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, stocksPrefixes, min1_output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
 
+		// 检查取消
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		fmt.Printf("🐢 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertFilesToCSV(VipdocDir, stocksPrefixes, min5_output, ".5")
+		_, err = tdx.ConvertFilesToCSV(ctx, VipdocDir, stocksPrefixes, min5_output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
 		}
@@ -164,14 +187,21 @@ func Convert(opts ConvertOptions) error {
 			return fmt.Errorf("failed to unzip file %s: %w", opts.InputPath, err)
 		}
 
+		// 检查取消
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		fmt.Printf("🐢 开始转换日线数据\n")
-		if err := tdx.DatatoolCreate(dataDir, "day", Today); err != nil {
+		if err := tdx.DatatoolCreate(dataDir, "day", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolDayCreate: %w", err)
 		}
 
 		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", baseName))
 
-		_, err := tdx.ConvertFilesToCSV(VipdocDir, allPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, allPrefixes, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
