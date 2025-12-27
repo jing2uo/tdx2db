@@ -7,7 +7,9 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-var Today = time.Now().Truncate(24 * time.Hour)
+func GetToday() time.Time {
+	return time.Now().Truncate(24 * time.Hour)
+}
 
 var TempDir, _ = utils.GetCacheDir()
 var VipdocDir = filepath.Join(TempDir, "vipdoc")

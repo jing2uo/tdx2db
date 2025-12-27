@@ -7,6 +7,8 @@ require (
 	github.com/duckdb/duckdb-go/v2 v2.5.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/spf13/cobra v1.10.1
+	golang.org/x/sync v0.17.0
+	golang.org/x/text v0.28.0
 )
 
 require (
@@ -42,7 +44,6 @@ require (
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/exp v0.0.0-20251017212417-90e834f514db // indirect
 	golang.org/x/mod v0.29.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/telemetry v0.0.0-20251022145735-5be28d707443 // indirect
 	golang.org/x/tools v0.38.0 // indirect

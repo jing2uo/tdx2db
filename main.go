@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/jing2uo/tdx2db/cmd"
 	"github.com/spf13/cobra"
@@ -32,6 +35,19 @@ Type & Input:
   -t day4  转换四代日线     -i 四代行情压缩文件`
 
 func main() {
+	// 创建可取消的 context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		sig := <-sigChan
+		fmt.Printf("\n🚨 收到信号 %v，正在退出...\n", sig)
+		cancel()
+	}()
+
 	var rootCmd = &cobra.Command{
 		Use:           "tdx2db",
 		Short:         "Load TDX Data to DuckDB",
@@ -42,6 +58,7 @@ func main() {
 		dbURI      string
 		dayFileDir string
 		minline    string
+		tdxHome    string
 
 		// Convert
 		inputType  string
@@ -55,14 +72,14 @@ func main() {
 		Example: `  tdx2db init --dburi 'clickhouse://localhost' --dayfiledir /path/to/vipdoc/
   tdx2db init --dburi 'duckdb://./tdx.db' --dayfiledir /path/to/vipdoc/` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			return cmd.Init(dbURI, dayFileDir)
+			return cmd.Init(ctx, dbURI, dayFileDir)
 		},
 	}
 
 	var cronCmd = &cobra.Command{
 		Use:   "cron",
 		Short: "Cron for update data and calc factor",
-		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --minline 1,5
+		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --minline 1,5 --tdxhome ~/new_tdx
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
 			if c.Flags().Changed("minline") {
@@ -71,7 +88,7 @@ func main() {
 					return fmt.Errorf("--minline 仅支持 '1'、'5'、'1,5', 传入: %s", minline)
 				}
 			}
-			return cmd.Cron(dbURI, minline)
+			return cmd.Cron(ctx, dbURI, minline, tdxHome)
 		},
 	}
 
@@ -101,7 +118,7 @@ func main() {
 				return fmt.Errorf("未知的类型: %s%s", inputType, convertHelp)
 			}
 
-			return cmd.Convert(opts)
+			return cmd.Convert(ctx, opts)
 		},
 	}
 
@@ -115,6 +132,7 @@ func main() {
 	cronCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
 	cronCmd.MarkFlagRequired("dburi")
 	cronCmd.Flags().StringVar(&minline, "minline", "", minLineInfo)
+	cronCmd.Flags().StringVar(&tdxHome, "tdxhome", "", "通达信安装目录")
 
 	// Convert Flags
 	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")
@@ -133,6 +151,10 @@ func main() {
 	})
 
 	if err := rootCmd.Execute(); err != nil {
+		if err == context.Canceled {
+			fmt.Fprintln(os.Stderr, "✅ 任务安全中断")
+			os.Exit(0)
+		}
 		fmt.Fprintf(os.Stderr, "🛑 错误: %v\n", err)
 		os.Exit(1)
 	}

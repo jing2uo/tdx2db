@@ -45,68 +45,100 @@ func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *DuckDBDriver) registerViews() {
-	// 通用创建复权视图函数
-	createAdjustView := func(viewName model.ViewID, factorCol string) error {
-		// 组装 SQL
-		priceFactor := "1"
-		if factorCol != "" {
-			priceFactor = "f." + factorCol
-		}
-
-		factorSelect := ""
-		switch factorCol {
-		case "qfq_factor":
-			factorSelect = "f.qfq_factor AS qfq_factor"
-		case "hfq_factor":
-			factorSelect = "f.hfq_factor AS hfq_factor"
-		default:
-			factorSelect = `
-                f.qfq_factor AS qfq_factor,
-                f.hfq_factor AS hfq_factor`
-		}
-
+	// 不复权视图 (BFQ)
+	d.viewImpls[model.ViewDailyBFQ] = func() error {
 		query := fmt.Sprintf(`
-            CREATE OR REPLACE VIEW %s AS
-            SELECT
-                s.symbol AS symbol,
-                s.date   AS date,
-                ROUND(s.open  * %s, 2) AS open,
-                ROUND(s.high  * %s, 2) AS high,
-                ROUND(s.low   * %s, 2) AS low,
-                ROUND(s.close * %s, 2) AS close,
-                b.preclose   AS preclose,
-                s.volume     AS volume,
-                s.amount     AS amount,
-                b.turnover   AS turnover,
-                b.floatmv    AS floatmv,
-                b.totalmv    AS totalmv,
-				%s
-            FROM %s s
-            LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
-            LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
-        `,
-			viewName,
-			priceFactor, priceFactor, priceFactor, priceFactor,
-			factorSelect,
+			CREATE OR REPLACE VIEW %s AS
+			SELECT
+				s.symbol   AS symbol,
+				s.date     AS date,
+				s.open     AS open,
+				s.high     AS high,
+				s.low      AS low,
+				s.close    AS close,
+				b.preclose AS preclose,
+				s.volume   AS volume,
+				s.amount   AS amount,
+				b.turnover AS turnover,
+				b.floatmv  AS floatmv,
+				b.totalmv  AS totalmv
+			FROM %s s
+			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+		`,
+			model.ViewDailyBFQ,
 			model.TableStocksDaily.TableName,
-			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
-
 		_, err := d.db.Exec(query)
 		return err
 	}
 
-	// 注册各个视图
-	d.viewImpls[model.ViewDailyBFQ] = func() error {
-		return createAdjustView(model.ViewDailyBFQ, "")
-	}
-
-	d.viewImpls[model.ViewDailyQFQ] = func() error {
-		return createAdjustView(model.ViewDailyQFQ, "qfq_factor")
-	}
-
+	// 后复权视图 (HFQ) - factor 表已和日线对齐，直接 JOIN
 	d.viewImpls[model.ViewDailyHFQ] = func() error {
-		return createAdjustView(model.ViewDailyHFQ, "hfq_factor")
+		query := fmt.Sprintf(`
+			CREATE OR REPLACE VIEW %s AS
+			SELECT
+				s.symbol   AS symbol,
+				s.date     AS date,
+				ROUND(s.open  * COALESCE(f.hfq_factor, 1), 2) AS open,
+				ROUND(s.high  * COALESCE(f.hfq_factor, 1), 2) AS high,
+				ROUND(s.low   * COALESCE(f.hfq_factor, 1), 2) AS low,
+				ROUND(s.close * COALESCE(f.hfq_factor, 1), 2) AS close,
+				ROUND(b.preclose * COALESCE(f.hfq_factor, 1), 2) AS preclose,
+				s.volume   AS volume,
+				s.amount   AS amount,
+				b.turnover AS turnover,
+				b.floatmv  AS floatmv,
+				b.totalmv  AS totalmv,
+				COALESCE(f.hfq_factor, 1) AS hfq_factor
+			FROM %s s
+			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+		`,
+			model.ViewDailyHFQ,
+			model.TableStocksDaily.TableName,
+			model.TableAdjustFactor.TableName,
+			model.TableBasic.TableName,
+		)
+		_, err := d.db.Exec(query)
+		return err
+	}
+
+	// 前复权视图 (QFQ) - qfq_factor = hfq_factor / latest_hfq_factor
+	d.viewImpls[model.ViewDailyQFQ] = func() error {
+		query := fmt.Sprintf(`
+			CREATE OR REPLACE VIEW %s AS
+			WITH latest_factors AS (
+				SELECT symbol, argMax(hfq_factor, date) AS latest_hfq
+				FROM %s
+				GROUP BY symbol
+			)
+			SELECT
+				s.symbol   AS symbol,
+				s.date     AS date,
+				ROUND(s.open  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS open,
+				ROUND(s.high  * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS high,
+				ROUND(s.low   * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS low,
+				ROUND(s.close * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS close,
+				ROUND(b.preclose * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS preclose,
+				s.volume   AS volume,
+				s.amount   AS amount,
+				b.turnover AS turnover,
+				b.floatmv  AS floatmv,
+				b.totalmv  AS totalmv,
+				COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
+			FROM %s s
+			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+			LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
+			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
+		`,
+			model.ViewDailyQFQ,
+			model.TableAdjustFactor.TableName,
+			model.TableStocksDaily.TableName,
+			model.TableAdjustFactor.TableName,
+			model.TableBasic.TableName,
+		)
+		_, err := d.db.Exec(query)
+		return err
 	}
 }

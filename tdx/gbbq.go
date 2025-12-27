@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jing2uo/tdx2db/model"
+	"github.com/jing2uo/tdx2db/utils"
 )
 
 func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
@@ -67,7 +68,7 @@ func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 		code := string(codeBytes[:strLen])
 
 		// 生成 Symbol 并过滤
-		symbol, ok := generateSymbol(code)
+		symbol, ok := utils.GenerateSymbol(code)
 		if !ok {
 			continue // 没匹配到规则，跳过
 		}
@@ -114,20 +115,6 @@ func fastParseDate(date uint32) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid date: %d", date)
 	}
 	return time.Date(y, time.Month(m), d, 0, 0, 0, 0, time.Local), nil
-}
-
-func generateSymbol(code string) (string, bool) {
-	switch {
-	case strings.HasPrefix(code, "00") || strings.HasPrefix(code, "30"):
-		return "sz" + code, true
-	case strings.HasPrefix(code, "60") || strings.HasPrefix(code, "68"):
-		return "sh" + code, true
-	case strings.HasPrefix(code, "92") || strings.HasPrefix(code, "87") ||
-		strings.HasPrefix(code, "83") || strings.HasPrefix(code, "43"):
-		return "bj" + code, true
-	default:
-		return "", false
-	}
 }
 
 // decryptBlockToBuf 优化后的解密函数

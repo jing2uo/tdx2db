@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +15,8 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-func Cron(dbURI string, minline string) error {
+// Cron 执行定时任务
+func Cron(ctx context.Context, dbURI, minline, tdxhome string) error {
 	db, err := database.NewDB(dbURI)
 	if err != nil {
 		return fmt.Errorf("failed to create database driver: %w", err)
@@ -30,55 +32,98 @@ func Cron(dbURI string, minline string) error {
 
 	defer db.Close()
 
-	err = UpdateStocksDaily(db)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	if err := UpdateStocksDaily(ctx, db); err != nil {
 		return fmt.Errorf("failed to update daily stock data: %w", err)
 	}
 
-	err = UpdateStocksMinLine(db, minline)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
+		fmt.Println("⚠️ 任务中断")
+		return err
+	}
+
+	if err := UpdateStocksMinLine(ctx, db, minline); err != nil {
 		return fmt.Errorf("failed to update minute-line stock data: %w", err)
 	}
 
-	err = UpdateGbbqAndFactors(db)
-	if err != nil {
+	if err := ctx.Err(); err != nil {
+		fmt.Println("⚠️ 任务中断")
+		return err
+	}
+
+	if err := UpdateGbbqAndFactors(ctx, db); err != nil {
 		return fmt.Errorf("failed to update GBBQ: %w", err)
 	}
+
+	if err := ctx.Err(); err != nil {
+		fmt.Println("⚠️ 任务中断")
+		return err
+	}
+
+	if err := UpdateTdxBlocksInfo(ctx, db, tdxhome); err != nil {
+		return fmt.Errorf("failed to update tdx blocks info: %w", err)
+	}
+
 	fmt.Println("🚀 今日任务执行成功")
 	return nil
 }
 
-func UpdateStocksDaily(db database.DataRepository) error {
+// UpdateStocksDaily 更新日线数据
+func UpdateStocksDaily(ctx context.Context, db database.DataRepository) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	latestDate, err := db.GetLatestDate(model.TableStocksDaily.TableName, "date")
 	if err != nil {
 		return fmt.Errorf("failed to get latest date from database: %w", err)
 	}
 	fmt.Printf("📅 日线数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
 
-	validDates, err := prepareTdxData(latestDate, "day")
+	validDates, err := prepareTdxData(ctx, latestDate, "day")
 	if err != nil {
 		return fmt.Errorf("failed to prepare tdx data: %w", err)
 	}
+
 	if len(validDates) > 0 {
 		fmt.Printf("🐢 开始转换日线数据\n")
-		_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, StockDailyCSV, ".day")
+
+		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, ValidPrefixes, StockDailyCSV, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files to csv: %w", err)
 		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
 		if err := db.ImportDailyStocks(StockDailyCSV); err != nil {
 			return fmt.Errorf("failed to import stock csv: %w", err)
 		}
 		fmt.Println("📊 日线数据导入成功")
 	} else {
 		fmt.Println("🌲 日线数据无需更新")
-
 	}
 	return nil
 }
 
-func UpdateStocksMinLine(db database.DataRepository, minline string) error {
+// UpdateStocksMinLine 更新分时数据
+func UpdateStocksMinLine(ctx context.Context, db database.DataRepository, minline string) error {
 	if minline == "" {
 		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
 	}
 
 	parts := strings.Split(minline, ",")
@@ -94,10 +139,9 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 	}
 
 	var latestDate time.Time
-	yesterday := Today.AddDate(0, 0, -1)
+	yesterday := GetToday().AddDate(0, 0, -1)
 
 	if need1Min && need5Min {
-
 		d1, err1 := db.GetLatestDate(model.TableStocks1Min.TableName, "datetime")
 		is1MinEmpty := (err1 != nil || d1.IsZero())
 
@@ -108,19 +152,15 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 			fmt.Println("🛑 警告：数据库中没有分时数据")
 			fmt.Println("🚧 将处理今天的数据，历史请自行导入")
 			latestDate = yesterday
-
 		} else if !d1.Equal(d5) {
-			return fmt.Errorf("1分钟数据最新日期[%s] 与 5分钟数据最新日期[%s] 不同。请先单独执行 '1' 或 '5' 保持一致后再使用组合命令。",
+			return fmt.Errorf("1分钟数据最新日期[%s] 与 5分钟数据最新日期[%s] 不同",
 				d1.Format("2006-01-02"), d5.Format("2006-01-02"))
-
 		} else {
 			latestDate = d1
 			fmt.Printf("📅 分时数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
 		}
-
 	} else {
 		var typeLabel string
-
 		if need1Min {
 			latestDate, _ = db.GetLatestDate(model.TableStocks1Min.TableName, "datetime")
 			typeLabel = "1分钟"
@@ -138,22 +178,27 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 		}
 	}
 
-	validDates, err := prepareTdxData(latestDate, "tic")
+	validDates, err := prepareTdxData(ctx, latestDate, "tic")
 	if err != nil {
 		return fmt.Errorf("failed to prepare tdx data: %w", err)
 	}
 
 	if len(validDates) >= 30 {
 		return fmt.Errorf("分时数据超过30天未更新，请手动补齐后继续")
-
 	}
 
 	if len(validDates) > 0 {
 		fmt.Printf("🐢 开始转换分时数据\n")
 		for _, p := range parts {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+			}
+
 			switch p {
 			case "1":
-				_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, Stock1MinCSV, ".01")
+				_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, ValidPrefixes, Stock1MinCSV, ".01")
 				if err != nil {
 					return fmt.Errorf("failed to convert .01 files to csv: %w", err)
 				}
@@ -163,7 +208,7 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 				fmt.Println("📊 1分钟数据导入成功")
 
 			case "5":
-				_, err := tdx.ConvertFilesToCSV(VipdocDir, ValidPrefixes, Stock5MinCSV, ".5")
+				_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, ValidPrefixes, Stock5MinCSV, ".5")
 				if err != nil {
 					return fmt.Errorf("failed to convert .5 files to csv: %w", err)
 				}
@@ -179,7 +224,14 @@ func UpdateStocksMinLine(db database.DataRepository, minline string) error {
 	return nil
 }
 
-func UpdateGbbqAndFactors(db database.DataRepository) error {
+// UpdateGbbqAndFactors 更新股本变迁和复权因子
+func UpdateGbbqAndFactors(ctx context.Context, db database.DataRepository) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	fmt.Println("🐢 开始下载股本变迁数据")
 
 	gbbqFile, err := getGbbqFile(TempDir)
@@ -193,21 +245,31 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 	}
 
 	gbbqCSV := filepath.Join(TempDir, "gbbq.csv")
-	gbbqCw, _ := utils.NewCSVWriter[model.GbbqData](gbbqCSV)
+	gbbqCw, err := utils.NewCSVWriter[model.GbbqData](gbbqCSV)
+	if err != nil {
+		return fmt.Errorf("failed to create GBBQ CSV writer: %w", err)
+	}
 	if err := gbbqCw.Write(gbbqData); err != nil {
 		return err
 	}
 	gbbqCw.Close()
+
 	if err := db.ImportGBBQ(gbbqCSV); err != nil {
 		return fmt.Errorf("failed to import GBBQ csv into database: %w", err)
 	}
 
 	fmt.Println("📈 股本变迁数据导入成功")
 
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
 	fmt.Println("📟 计算所有股票基础行情")
 	basicCSV := filepath.Join(TempDir, "basics.csv")
 
-	rowCount, err := calc.ExportStockBasicToCSV(db, gbbqData, basicCSV)
+	rowCount, err := calc.ExportStockBasicToCSV(ctx, db, basicCSV)
 	if err != nil {
 		return fmt.Errorf("failed to export basic to csv: %w", err)
 	}
@@ -221,24 +283,74 @@ func UpdateGbbqAndFactors(db database.DataRepository) error {
 		fmt.Println("🔢 基础行情导入成功")
 	}
 
-	fmt.Println("📟 计算所有股票复权因子")
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	fmt.Println("📟 计算股票复权因子")
 	factorCSV := filepath.Join(TempDir, "factor.csv")
 
-	if err := calc.ExportFactorsToCSV(db, factorCSV); err != nil {
+	factorCount, err := calc.ExportFactorsToCSV(ctx, db, factorCSV)
+	if err != nil {
 		return fmt.Errorf("failed to export factor to csv: %w", err)
 	}
-	if err := db.ImportAdjustFactors(factorCSV); err != nil {
-		return fmt.Errorf("failed to import factor data: %w", err)
-	}
-	fmt.Println("🔢 复权因子导入成功")
 
+	if factorCount == 0 {
+		fmt.Println("🌲 复权因子无需更新")
+	} else {
+		if err := db.ImportAdjustFactors(factorCSV); err != nil {
+			return fmt.Errorf("failed to append factor data: %w", err)
+		}
+		fmt.Printf("🔢 复权因子导入成功\n")
+	}
 	return nil
 }
 
-func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) {
+// UpdateTdxBlocksInfo 更新板块信息
+func UpdateTdxBlocksInfo(ctx context.Context, db database.DataRepository, tdxHome string) error {
+	if tdxHome == "" {
+		return nil
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	fmt.Printf("🐢 导入通达信概念行业等信息\n")
+	result, err := tdx.ExportTdxBlocksDataToCSV(tdxHome, TempDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "🚨 警告: %v\n", err)
+		return nil
+	}
+
+	if result.StockInfoFile != "" {
+		db.ImportStocksInfo(result.StockInfoFile)
+	}
+	if result.HolidaysFile != "" {
+		db.ImportHolidays(result.HolidaysFile)
+	}
+	if result.BlockInfoFile != "" {
+		db.ImportBlocksInfo(result.BlockInfoFile)
+	}
+	if result.BlockMembersConceptFile != "" {
+		db.TruncateTable(model.TableBlockMember)
+		db.ImportBlocksMember(result.BlockMembersConceptFile)
+	}
+	if result.BlockMembersIndustryFile != "" {
+		db.ImportBlocksMember(result.BlockMembersIndustryFile)
+	}
+	return nil
+}
+
+func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string) ([]time.Time, error) {
 	var dates []time.Time
 
-	for d := latestDate.Add(24 * time.Hour); !d.After(Today); d = d.Add(24 * time.Hour) {
+	today := GetToday()
+	for d := latestDate.Add(24 * time.Hour); !d.After(today); d = d.Add(24 * time.Hour) {
 		dates = append(dates, d)
 	}
 
@@ -272,6 +384,12 @@ func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 	validDates := make([]time.Time, 0, len(dates))
 
 	for _, date := range dates {
+		select {
+		case <-ctx.Done():
+			return validDates, ctx.Err()
+		default:
+		}
+
 		dateStr := date.Format("20060102")
 		url := fmt.Sprintf(urlTemplate, dateStr)
 		fileName := fmt.Sprintf("%s%s.zip", dateStr, fileSuffix)
@@ -280,7 +398,6 @@ func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 		status, err := utils.DownloadFile(url, filePath)
 		switch status {
 		case 200:
-
 			fmt.Printf("✅ 已下载 %s 的数据\n", dateStr)
 
 			if err := utils.UnzipFile(filePath, targetPath); err != nil {
@@ -294,13 +411,18 @@ func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 			continue
 		default:
 			if err != nil {
-				return nil, nil
+				return nil, fmt.Errorf("download failed: %w", err)
 			}
 		}
-
 	}
 
 	if len(validDates) > 0 {
+		select {
+		case <-ctx.Done():
+			return validDates, ctx.Err()
+		default:
+		}
+
 		endDate := validDates[len(validDates)-1]
 		switch dataType {
 		case "day":
@@ -309,7 +431,6 @@ func prepareTdxData(latestDate time.Time, dataType string) ([]time.Time, error) 
 			}
 
 		case "tic":
-			endDate := validDates[len(validDates)-1]
 			fmt.Printf("🐢 开始转档分笔数据\n")
 			if err := tdx.DatatoolCreate(TempDir, "tick", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
