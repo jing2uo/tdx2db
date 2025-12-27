@@ -28,7 +28,11 @@ type DataRepository interface {
 	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)
 	GetAllSymbols() ([]string, error)
+
 	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
 	GetLatestBasicBySymbol(symbol string) ([]model.StockBasic, error)
-	GetLatestBasics() ([]model.StockBasic, error)
+	GetBasicsSince(sinceDate time.Time) ([]model.StockBasic, error)
+
+	GetGbbq() ([]model.GbbqData, error)
+	GetLatestFactors() ([]model.Factor, error)
 }

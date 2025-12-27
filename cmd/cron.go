@@ -269,7 +269,7 @@ func UpdateGbbqAndFactors(ctx context.Context, db database.DataRepository) error
 	fmt.Println("📟 计算所有股票基础行情")
 	basicCSV := filepath.Join(TempDir, "basics.csv")
 
-	rowCount, err := calc.ExportStockBasicToCSV(ctx, db, gbbqData, basicCSV)
+	rowCount, err := calc.ExportStockBasicToCSV(ctx, db, basicCSV)
 	if err != nil {
 		return fmt.Errorf("failed to export basic to csv: %w", err)
 	}
@@ -289,17 +289,22 @@ func UpdateGbbqAndFactors(ctx context.Context, db database.DataRepository) error
 	default:
 	}
 
-	fmt.Println("📟 计算所有股票复权因子")
+	fmt.Println("📟 计算股票复权因子")
 	factorCSV := filepath.Join(TempDir, "factor.csv")
 
-	if err := calc.ExportFactorsToCSV(ctx, db, factorCSV); err != nil {
+	factorCount, err := calc.ExportFactorsToCSV(ctx, db, factorCSV)
+	if err != nil {
 		return fmt.Errorf("failed to export factor to csv: %w", err)
 	}
-	if err := db.ImportAdjustFactors(factorCSV); err != nil {
-		return fmt.Errorf("failed to import factor data: %w", err)
-	}
-	fmt.Println("🔢 复权因子导入成功")
 
+	if factorCount == 0 {
+		fmt.Println("🌲 复权因子无需更新")
+	} else {
+		if err := db.ImportAdjustFactors(factorCSV); err != nil {
+			return fmt.Errorf("failed to append factor data: %w", err)
+		}
+		fmt.Printf("🔢 复权因子导入成功\n")
+	}
 	return nil
 }
 

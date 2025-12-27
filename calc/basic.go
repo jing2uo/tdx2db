@@ -39,18 +39,21 @@ type BasicContext struct {
 func ExportStockBasicToCSV(
 	ctx context.Context,
 	db database.DataRepository,
-	gbbqData []model.GbbqData,
 	csvPath string,
 ) (int, error) {
 
 	startDate, _ := db.GetLatestDate(model.TableBasic.TableName, "date")
 	isIncremental := !startDate.IsZero() && startDate.Year() > 1900
 
+	gbbqData, err := db.GetGbbq()
+	if err != nil {
+		return 0, fmt.Errorf("failed to query gbbq: %w", err)
+	}
 	gbbqIndex := buildGbbqIndex(gbbqData)
 
 	var stateIndex StateIndex
 	if isIncremental {
-		lastBasics, err := db.GetLatestBasics()
+		lastBasics, err := db.GetBasicsSince(startDate)
 		if err != nil {
 			return 0, fmt.Errorf("failed to query last basic state: %w", err)
 		}

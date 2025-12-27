@@ -66,7 +66,6 @@ func (d *DuckDBDriver) ImportBasic(path string) error {
 }
 
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
-	d.TruncateTable(model.TableAdjustFactor)
 	return d.importCSV(model.TableAdjustFactor, path)
 }
 
@@ -190,17 +189,48 @@ func (d *DuckDBDriver) GetLatestBasicBySymbol(symbol string) ([]model.StockBasic
 	return results, nil
 }
 
-func (d *DuckDBDriver) GetLatestBasics() ([]model.StockBasic, error) {
+// GetBasicsSince 获取指定日期及之后的所有 basic
+func (d *DuckDBDriver) GetBasicsSince(sinceDate time.Time) ([]model.StockBasic, error) {
 	table := model.TableBasic.TableName
 
-	query := fmt.Sprintf(
-		`SELECT * FROM %s WHERE date = (SELECT max(date) FROM %s) ORDER BY symbol`,
-		table, table,
-	)
+	query := fmt.Sprintf(`
+		SELECT date, symbol, close, preclose, turnover, floatmv, totalmv
+		FROM %s WHERE date >= ? ORDER BY symbol, date
+	`, table)
 
 	var results []model.StockBasic
+	if err := d.db.Select(&results, query, sinceDate); err != nil {
+		return nil, fmt.Errorf("failed to query basics since %v: %w", sinceDate, err)
+	}
+
+	return results, nil
+}
+
+func (d *DuckDBDriver) GetGbbq() ([]model.GbbqData, error) {
+	table := model.TableGbbq.TableName
+
+	query := fmt.Sprintf(`SELECT * FROM %s ORDER BY symbol, date`, table)
+
+	var results []model.GbbqData
 	if err := d.db.Select(&results, query); err != nil {
-		return nil, fmt.Errorf("failed to query latest daily basics: %w", err)
+		return nil, fmt.Errorf("failed to query gbbq: %w", err)
+	}
+
+	return results, nil
+}
+
+func (d *DuckDBDriver) GetLatestFactors() ([]model.Factor, error) {
+	table := model.TableAdjustFactor.TableName
+
+	query := fmt.Sprintf(`
+		SELECT symbol, date, hfq_factor
+		FROM %s
+		QUALIFY ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) = 1
+	`, table)
+
+	var results []model.Factor
+	if err := d.db.Select(&results, query); err != nil {
+		return nil, fmt.Errorf("failed to query latest factors: %w", err)
 	}
 
 	return results, nil

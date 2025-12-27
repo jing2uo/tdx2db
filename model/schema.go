@@ -27,7 +27,6 @@ type StockMinData struct {
 type Factor struct {
 	Symbol    string    `col:"symbol"`
 	Date      time.Time `col:"date" type:"date"`
-	QfqFactor float64   `col:"qfq_factor"`
 	HfqFactor float64   `col:"hfq_factor"`
 }
 
