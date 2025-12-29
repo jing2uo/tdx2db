@@ -127,7 +127,7 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 
 ### 拓展数据
 
-cron 命令支持导入通达信概念、风格、行业成分，也处理股票名称和假期。
+cron 命令支持导入通达信概念、风格、行业成分，也处理假期。
 
 ```bash
 # tdxhome 表示通达信安装目录，可以和 --minline 共用
@@ -146,7 +146,6 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 | `raw_stocks_5min`       | 5 分钟 K 线                   |
 | `raw_stocks_basic`      | 前收盘价、换手率与市值        |
 | `raw_stocks_daily`      | 股票日线数据                  |
-| `raw_stocks_info`       | 股票代码和名称                |
 | `raw_tdx_blocks_info`   | 概念、风格、行业板块信息      |
 | `raw_tdx_blocks_member` | 板块成分                      |
 | `v_bfq_daily`           | 不复权日线，包含 stocks_basic |

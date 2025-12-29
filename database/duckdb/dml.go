@@ -69,11 +69,6 @@ func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
 	return d.importCSV(model.TableAdjustFactor, path)
 }
 
-func (d *DuckDBDriver) ImportStocksInfo(path string) error {
-	d.TruncateTable(model.TableStockInfo)
-	return d.importCSV(model.TableStockInfo, path)
-}
-
 func (d *DuckDBDriver) ImportHolidays(path string) error {
 	d.TruncateTable(model.TableHoliday)
 	return d.importCSV(model.TableHoliday, path)

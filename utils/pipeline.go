@@ -7,8 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 // PipelineResult 执行结果统计
@@ -65,7 +63,7 @@ func NewPipeline[I, O any](opts ...PipelineOption) *Pipeline[I, O] {
 	}
 
 	if cfg.bufferSize == 0 {
-		cfg.bufferSize = cfg.concurrency * 2
+		cfg.bufferSize = cfg.concurrency * 4
 	}
 
 	return &Pipeline[I, O]{
@@ -97,22 +95,13 @@ func (p *Pipeline[I, O]) Run(
 
 	resultChan := make(chan batchResult[O], p.bufferSize)
 
-	g, gCtx := errgroup.WithContext(ctx)
-	g.SetLimit(p.concurrency)
-
+	sem := make(chan struct{}, p.concurrency)
+	var producerWg sync.WaitGroup
 	var consumerWg sync.WaitGroup
 	consumerWg.Add(1)
-
 	go func() {
 		defer consumerWg.Done()
-
 		for batch := range resultChan {
-			select {
-			case <-gCtx.Done():
-				return
-			default:
-			}
-
 			if batch.Err != nil {
 				p.collectError(batch.Err)
 				continue
@@ -129,37 +118,30 @@ func (p *Pipeline[I, O]) Run(
 	}()
 
 	for _, input := range inputs {
-		input := input
+		producerWg.Add(1)
 
-		g.Go(func() error {
+		go func() {
+			defer producerWg.Done()
 			defer func() {
 				if r := recover(); r != nil {
-					p.collectError(fmt.Errorf("panic: %v", r))
+					p.collectError(fmt.Errorf("panic processing input: %v", r))
 				}
 			}()
 
-			select {
-			case <-gCtx.Done():
-				return gCtx.Err()
-			default:
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			rows, err := process(ctx, input)
+
+			resultChan <- batchResult[O]{Rows: rows, Err: err}
+
+			if err == nil {
+				p.processedItems.Add(1)
 			}
-
-			rows, err := process(gCtx, input)
-
-			select {
-			case resultChan <- batchResult[O]{Rows: rows, Err: err}:
-				if err == nil {
-					p.processedItems.Add(1)
-				}
-			case <-gCtx.Done():
-				return gCtx.Err()
-			}
-
-			return nil
-		})
+		}()
 	}
 
-	producerErr := g.Wait()
+	producerWg.Wait()
 	close(resultChan)
 	consumerWg.Wait()
 
@@ -169,10 +151,6 @@ func (p *Pipeline[I, O]) Run(
 		OutputRows:     p.outputRows.Load(),
 		Errors:         p.getErrors(),
 		Duration:       time.Since(startTime),
-	}
-
-	if producerErr != nil && producerErr != context.Canceled {
-		return result, producerErr
 	}
 
 	return result, nil

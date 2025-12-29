@@ -31,13 +31,15 @@ type Factor struct {
 }
 
 type StockBasic struct {
-	Date     time.Time `col:"date" type:"date"`
-	Symbol   string    `col:"symbol"`
-	Close    float64   `col:"close"`
-	PreClose float64   `col:"preclose"`
-	Turnover float64   `col:"turnover"`
-	FloatMV  float64   `col:"floatmv"`
-	TotalMV  float64   `col:"totalmv"`
+	Date          time.Time `col:"date" type:"date"`
+	Symbol        string    `col:"symbol"`
+	Close         float64   `col:"close"`
+	PreClose      float64   `col:"preclose"`
+	ChangePercent float64   `col:"change_pct"`
+	Amplitude     float64   `col:"amplitude"`
+	Turnover      float64   `col:"turnover"`
+	FloatMV       float64   `col:"floatmv"`
+	TotalMV       float64   `col:"totalmv"`
 }
 
 type GbbqData struct {
@@ -52,11 +54,6 @@ type GbbqData struct {
 
 type Holiday struct {
 	Date time.Time `col:"date" type:"date"`
-}
-
-type StockInfo struct {
-	Symbol string `col:"symbol"`
-	Name   string `col:"name"`
 }
 
 type BlockMember struct {

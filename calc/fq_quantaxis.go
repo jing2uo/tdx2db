@@ -25,7 +25,7 @@ type FactorContext struct {
 	DB            database.DataRepository
 	GbbqIndex     GbbqIndex
 	StateIndex    FactorStateIndex
-	BasicsMap     map[string][]model.StockBasic // 增量模式：按 symbol 分组的新 basic
+	BasicsMap     map[string][]model.StockBasic
 	IsIncremental bool
 }
 

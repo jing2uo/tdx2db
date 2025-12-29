@@ -1,7 +1,6 @@
 package tdx
 
 import (
-	"bufio"
 	"encoding/csv"
 	"fmt"
 	"io"
@@ -20,7 +19,6 @@ import (
 
 // ExportResult 导出结果，包含所有生成的CSV文件路径
 type ExportResult struct {
-	StockInfoFile            string
 	HolidaysFile             string
 	BlockMembersConceptFile  string
 	BlockMembersIndustryFile string
@@ -32,27 +30,26 @@ func ExportTdxBlocksDataToCSV(tdxHome, outputDir string) (*ExportResult, error) 
 	tdxHome = expandPath(tdxHome)
 	outputDir = expandPath(outputDir)
 
-	// 1. 检查并创建输出目录（这是必须的，如果失败则返回错误）
+	// 检查并创建输出目录（这是必须的，如果失败则返回错误）
 	if err := utils.CheckOutputDir(outputDir); err != nil {
 		return nil, fmt.Errorf("输出目录检查失败: %w", err)
 	}
 
-	// 2. 检查 hq_cache 目录（这是必须的，如果失败则返回错误）
+	// 检查 hq_cache 目录（这是必须的，如果失败则返回错误）
 	hqCache := filepath.Join(tdxHome, "T0002/hq_cache")
 	if err := utils.CheckDirectory(hqCache); err != nil {
 		return nil, fmt.Errorf("通达信安装目录检查失败: %w", err)
 	}
 
-	// 3. 定义所有输入文件
+	// 定义所有输入文件
 	inputFiles := map[string]string{
-		"股票信息文件": filepath.Join(hqCache, "infoharbor_ex.code"),
 		"假期日历文件": filepath.Join(hqCache, "needini.dat"),
 		"概念板块文件": filepath.Join(hqCache, "infoharbor_block.dat"),
 		"行业数据文件": filepath.Join(hqCache, "tdxhy.cfg"),
 		"板块信息文件": filepath.Join(hqCache, "tdxzs3.cfg"),
 	}
 
-	// 4. 检查所有输入文件，记录哪些文件可用
+	// 检查所有输入文件，记录哪些文件可用
 	fileAvailable := make(map[string]bool)
 	for name, path := range inputFiles {
 		if err := utils.CheckFile(path); err != nil {
@@ -63,28 +60,15 @@ func ExportTdxBlocksDataToCSV(tdxHome, outputDir string) (*ExportResult, error) 
 		}
 	}
 
-	// 5. 构建输出结果结构（初始化所有路径）
+	// 构建输出结果结构（初始化所有路径）
 	result := &ExportResult{
-		StockInfoFile:            filepath.Join(outputDir, "stocks_info.csv"),
 		HolidaysFile:             filepath.Join(outputDir, "holidays.csv"),
 		BlockMembersConceptFile:  filepath.Join(outputDir, "blocks_concept_member.csv"),
 		BlockMembersIndustryFile: filepath.Join(outputDir, "blocks_industry_member.csv"),
 		BlockInfoFile:            filepath.Join(outputDir, "blocks_info.csv"),
 	}
 
-	// 6. 导出股票信息
-	if fileAvailable["股票信息文件"] {
-		stockInfo, err := ReadInfoharborCode(inputFiles["股票信息文件"])
-		if err != nil {
-			result.StockInfoFile = ""
-		} else if err := writeCSV(result.StockInfoFile, stockInfo); err != nil {
-			result.StockInfoFile = ""
-		}
-	} else {
-		result.StockInfoFile = ""
-	}
-
-	// 7. 导出交易日历
+	// 导出交易日历
 	if fileAvailable["假期日历文件"] {
 		holidays, err := ReadHolidays(inputFiles["假期日历文件"])
 		if err != nil {
@@ -96,7 +80,7 @@ func ExportTdxBlocksDataToCSV(tdxHome, outputDir string) (*ExportResult, error) 
 		result.HolidaysFile = ""
 	}
 
-	// 8. 导出概念板块成员
+	// 导出概念板块成员
 	if fileAvailable["概念板块文件"] {
 		gnbkData, err := ReadInfoharborBlock(inputFiles["概念板块文件"])
 		if err != nil {
@@ -108,7 +92,7 @@ func ExportTdxBlocksDataToCSV(tdxHome, outputDir string) (*ExportResult, error) 
 		result.BlockMembersConceptFile = ""
 	}
 
-	// 9. 导出行业成员
+	// 导出行业成员
 	if fileAvailable["行业数据文件"] {
 		tdxhyData, err := ReadTDXHY(inputFiles["行业数据文件"])
 		if err != nil {
@@ -120,7 +104,7 @@ func ExportTdxBlocksDataToCSV(tdxHome, outputDir string) (*ExportResult, error) 
 		result.BlockMembersIndustryFile = ""
 	}
 
-	// 10. 导出板块信息
+	// 导出板块信息
 	if fileAvailable["板块信息文件"] {
 		blockInfo, err := ReadTDXZS3(inputFiles["板块信息文件"])
 		if err != nil {
@@ -207,46 +191,6 @@ func ReadHolidays(filePath string) ([]model.Holiday, error) {
 	}
 
 	return holidays, nil
-}
-
-// ReadInfoharborCode 读取股票代码文件
-func ReadInfoharborCode(filePath string) ([]model.StockInfo, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	decoder := transform.NewReader(file, simplifiedchinese.GBK.NewDecoder())
-	scanner := bufio.NewScanner(decoder)
-
-	var stockInfos []model.StockInfo
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			continue
-		}
-
-		parts := strings.Split(line, "|")
-		if len(parts) >= 2 {
-			code := strings.TrimSpace(parts[0])
-			name := strings.TrimSpace(parts[1])
-			symbol, ok := utils.GenerateSymbol(code)
-			if ok {
-				stockInfos = append(stockInfos, model.StockInfo{
-					Symbol: symbol,
-					Name:   name,
-				})
-			}
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return stockInfos, nil
 }
 
 // ReadInfoharborBlock 读取概念、风格、指数成分股

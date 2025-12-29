@@ -98,11 +98,6 @@ func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
 	return d.importCSV(model.TableAdjustFactor, path)
 }
 
-func (d *ClickHouseDriver) ImportStocksInfo(path string) error {
-	d.TruncateTable(model.TableStockInfo)
-	return d.importCSV(model.TableStockInfo, path)
-}
-
 func (d *ClickHouseDriver) ImportHolidays(path string) error {
 	d.TruncateTable(model.TableHoliday)
 	return d.importCSV(model.TableHoliday, path)

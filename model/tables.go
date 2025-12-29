@@ -145,12 +145,6 @@ var TableBasic = SchemaFromStruct(
 	[]string{"symbol", "date"},
 )
 
-var TableStockInfo = SchemaFromStruct(
-	"raw_stocks_info",
-	StockInfo{},
-	[]string{""},
-)
-
 var TableHoliday = SchemaFromStruct(
 	"raw_holidays",
 	Holiday{},
