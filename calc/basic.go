@@ -250,6 +250,14 @@ func CalculateStockBasic(
 
 		basic.PreClose = calculatePreClosePrice(prevClose, xdxrMap[i])
 
+		if basic.PreClose > 0 {
+			ChangePercent := (sd.Close - basic.PreClose) / basic.PreClose * 100
+			basic.ChangePercent = math.Round(ChangePercent*100) / 100
+
+			amplitude := (sd.High - sd.Low) / basic.PreClose * 100
+			basic.Amplitude = math.Round(amplitude*100) / 100
+		}
+
 		for shareIdx < shareLen && !sharesList[shareIdx].Date.After(sd.Date) {
 			currentFloat = sharesList[shareIdx].C3
 			currentTotal = sharesList[shareIdx].C4

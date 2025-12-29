@@ -327,9 +327,6 @@ func UpdateTdxBlocksInfo(ctx context.Context, db database.DataRepository, tdxHom
 		return nil
 	}
 
-	if result.StockInfoFile != "" {
-		db.ImportStocksInfo(result.StockInfoFile)
-	}
 	if result.HolidaysFile != "" {
 		db.ImportHolidays(result.HolidaysFile)
 	}

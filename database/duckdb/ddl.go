@@ -49,24 +49,37 @@ func (d *DuckDBDriver) registerViews() {
 	d.viewImpls[model.ViewDailyBFQ] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
+			WITH latest_factors AS (
+				SELECT symbol, argMax(hfq_factor, date) AS latest_hfq
+				FROM %s
+				GROUP BY symbol
+			)
 			SELECT
-				s.symbol   AS symbol,
-				s.date     AS date,
-				s.open     AS open,
-				s.high     AS high,
-				s.low      AS low,
-				s.close    AS close,
-				b.preclose AS preclose,
-				s.volume   AS volume,
-				s.amount   AS amount,
-				b.turnover AS turnover,
-				b.floatmv  AS floatmv,
-				b.totalmv  AS totalmv
+				s.symbol     AS symbol,
+				s.date       AS date,
+				s.open       AS open,
+				s.high       AS high,
+				s.low        AS low,
+				s.close      AS close,
+				b.preclose   AS preclose,
+				s.volume     AS volume,
+				s.amount     AS amount,
+				b.turnover   AS turnover,
+				b.floatmv    AS floatmv,
+				b.totalmv    AS totalmv,
+				b.change_pct AS change_pct,
+				b.amplitude  AS amplitude,
+				COALESCE(f.hfq_factor, 1) AS hfq_factor,
+				COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 			FROM %s s
+			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
+			LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 		`,
 			model.ViewDailyBFQ,
+			model.TableAdjustFactor.TableName,
 			model.TableStocksDaily.TableName,
+			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
 		_, err := d.db.Exec(query)
@@ -85,11 +98,13 @@ func (d *DuckDBDriver) registerViews() {
 				ROUND(s.low   * COALESCE(f.hfq_factor, 1), 2) AS low,
 				ROUND(s.close * COALESCE(f.hfq_factor, 1), 2) AS close,
 				ROUND(b.preclose * COALESCE(f.hfq_factor, 1), 2) AS preclose,
-				s.volume   AS volume,
-				s.amount   AS amount,
-				b.turnover AS turnover,
-				b.floatmv  AS floatmv,
-				b.totalmv  AS totalmv,
+				s.volume     AS volume,
+				s.amount     AS amount,
+				b.turnover   AS turnover,
+				b.floatmv    AS floatmv,
+				b.totalmv    AS totalmv,
+				b.change_pct AS change_pct,
+				b.amplitude  AS amplitude,
 				COALESCE(f.hfq_factor, 1) AS hfq_factor
 			FROM %s s
 			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
@@ -121,11 +136,13 @@ func (d *DuckDBDriver) registerViews() {
 				ROUND(s.low   * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS low,
 				ROUND(s.close * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS close,
 				ROUND(b.preclose * COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1), 2) AS preclose,
-				s.volume   AS volume,
-				s.amount   AS amount,
-				b.turnover AS turnover,
-				b.floatmv  AS floatmv,
-				b.totalmv  AS totalmv,
+				s.volume     AS volume,
+				s.amount     AS amount,
+				b.turnover   AS turnover,
+				b.floatmv    AS floatmv,
+				b.totalmv    AS totalmv,
+				b.change_pct AS change_pct,
+				b.amplitude  AS amplitude,
 				COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 			FROM %s s
 			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
