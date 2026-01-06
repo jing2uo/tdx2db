@@ -1,3 +1,7 @@
+<p align="center">
+<img src="./tdx2db.png" width="300"/>
+</p>
+
 # tdx2db - 获得专属的 A 股行情数据库
 
 [![GitHub release](https://img.shields.io/github/v/release/jing2uo/tdx2db?style=flat-square)](https://github.com/jing2uo/tdx2db/releases)
@@ -20,6 +24,7 @@
 
 - 代码不会兼容历史版本且会写出 bug，请谨慎检查数据正确性，不对你的损失负责。
 - 如果导入了分时请保留原始数据并定期备份，数据更新出问题日线可以快速还原，分时很麻烦。
+- 使用遇到问题可以来 [Telegram](https://t.me/tdx2db) 讨论，即时沟通。
 
 ## 安装说明
 
