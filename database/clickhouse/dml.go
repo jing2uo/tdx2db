@@ -36,6 +36,7 @@ func (d *ClickHouseDriver) importCSV(meta *model.TableMeta, filePath string) err
 
 	q.Add("query", fmt.Sprintf("INSERT INTO %s FORMAT CSVWithNames", meta.TableName))
 	q.Add("date_time_input_format", "best_effort")
+	q.Add("session_timezone", "Asia/Shanghai")
 
 	req.URL.RawQuery = q.Encode()
 
