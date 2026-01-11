@@ -16,7 +16,7 @@ const dbURIInfo = "数据库连接信息"
 const dbURIHelp = `
 
 Database URI:
-  ClickHouse: clickhouse//:[user[:password]@][host][:port][/database][?http_port=p&]
+  ClickHouse: clickhouse://[user[:password]@][host][:port][/database][?http_port=p&]
   DuckDB:     duckdb://[path]`
 
 const dayFileInfo = "通达信日线文件目录"

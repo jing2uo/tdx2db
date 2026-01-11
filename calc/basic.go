@@ -331,9 +331,9 @@ func mergeXdxrFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
 	info := m[idx]
 	info.Fenhong += data.C1
 	info.Peigu += data.C2
-	info.Songzhuangu += data.C4
-	if data.C3 > 0 {
-		info.Peigujia = data.C3
+	info.Songzhuangu += data.C3
+	if data.C4 > 0 {
+		info.Peigujia = data.C4
 	}
 }
 
