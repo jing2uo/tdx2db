@@ -13,9 +13,6 @@ func GetToday() time.Time {
 
 var TempDir, _ = utils.GetCacheDir()
 var VipdocDir = filepath.Join(TempDir, "vipdoc")
-var StockDailyCSV = filepath.Join(TempDir, "stock.csv")
-var Stock1MinCSV = filepath.Join(TempDir, "1min.csv")
-var Stock5MinCSV = filepath.Join(TempDir, "5min.csv")
 
 var MarketPrefixes = []string{
 	"sz30",  // 创业板

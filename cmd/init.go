@@ -6,11 +6,9 @@ import (
 
 	_ "github.com/duckdb/duckdb-go/v2"
 	"github.com/jing2uo/tdx2db/database"
-	"github.com/jing2uo/tdx2db/tdx"
-	"github.com/jing2uo/tdx2db/utils"
+	"github.com/jing2uo/tdx2db/workflow"
 )
 
-// Init 初始化导入日线数据
 func Init(ctx context.Context, dbURI, dayFileDir string) error {
 	db, err := database.NewDB(dbURI)
 	if err != nil {
@@ -26,36 +24,37 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
-	// 检查取消
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
-	}
-
-	fmt.Printf("📦 开始处理日线目录: %s\n", dayFileDir)
-	if err := utils.CheckDirectory(dayFileDir); err != nil {
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	fmt.Println("🐢 开始转换日线数据")
-	_, err = tdx.ConvertFilesToCSV(ctx, dayFileDir, ValidPrefixes, StockDailyCSV, ".day")
+	count, err := db.CountStocksDaily()
 	if err != nil {
-		return fmt.Errorf("failed to convert day files to csv: %w", err)
-	}
-	fmt.Println("🔥 转换完成")
-
-	// 检查取消
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	default:
+		return fmt.Errorf("failed to check database status: %w", err)
 	}
 
-	if err := db.ImportDailyStocks(StockDailyCSV); err != nil {
-		return fmt.Errorf("failed to import stock csv: %w", err)
+	if count > 0 {
+		fmt.Printf("🙈 数据库已包含 %d 条日线记录\n", count)
+		fmt.Printf("🎉 无需初始化\n")
+		return nil
 	}
 
-	fmt.Println("🚀 股票数据导入成功")
+	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
+
+	args := &workflow.TaskArgs{
+		DayFileDir:    dayFileDir,
+		TempDir:       TempDir,
+		VipdocDir:     VipdocDir,
+		ValidPrefixes: ValidPrefixes,
+		Today:         GetToday(),
+	}
+
+	taskNames := workflow.GetInitTaskNames()
+
+	if err := executor.Run(ctx, taskNames, args); err != nil {
+		return fmt.Errorf("workflow execution failed: %w", err)
+	}
+
+	fmt.Println("🚀 初始化完成")
 	return nil
 }
