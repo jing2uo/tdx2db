@@ -150,6 +150,19 @@ func (d *ClickHouseDriver) GetAllSymbols() ([]string, error) {
 		return nil, fmt.Errorf("failed to query symbols: %w", err)
 	}
 	return symbols, nil
+
+}
+
+func (d *ClickHouseDriver) CountStocksDaily() (int64, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", model.TableStocksDaily.TableName)
+
+	var count int64
+	err := d.db.Get(&count, query)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count stocks: %w", err)
+	}
+
+	return count, nil
 }
 
 func (d *ClickHouseDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {

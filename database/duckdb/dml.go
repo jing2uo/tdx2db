@@ -128,6 +128,18 @@ func (d *DuckDBDriver) GetAllSymbols() ([]string, error) {
 	return symbols, nil
 }
 
+func (d *DuckDBDriver) CountStocksDaily() (int64, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", model.TableStocksDaily.TableName)
+
+	var count int64
+	err := d.db.Get(&count, query)
+	if err != nil {
+		return 0, fmt.Errorf("failed to count stocks: %w", err)
+	}
+
+	return count, nil
+}
+
 func (d *DuckDBDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
 
 	conditions := []string{"symbol = ?"}

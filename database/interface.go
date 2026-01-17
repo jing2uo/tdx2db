@@ -27,6 +27,8 @@ type DataRepository interface {
 	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)
 	GetAllSymbols() ([]string, error)
+	CountStocksDaily() (int64, error)
+
 
 	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
 	GetLatestBasicBySymbol(symbol string) ([]model.StockBasic, error)
