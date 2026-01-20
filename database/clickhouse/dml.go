@@ -64,14 +64,13 @@ func (d *ClickHouseDriver) TruncateTable(meta *model.TableMeta) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	query := fmt.Sprintf("TRUNCATE TABLE IF EXISTS %s", meta.TableName)
-
+	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", meta.TableName)
 	_, err := d.db.ExecContext(ctx, query)
 	if err != nil {
-		return fmt.Errorf("clickhouse truncate via tcp failed: %w", err)
+		return fmt.Errorf("clickhouse drop table failed: %w", err)
 	}
 
-	return nil
+	return d.createTableInternal(meta)
 }
 
 func (d *ClickHouseDriver) ImportDailyStocks(path string) error {

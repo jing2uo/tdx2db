@@ -33,15 +33,13 @@ func (d *DuckDBDriver) importCSV(meta *model.TableMeta, csvPath string) error {
 }
 
 func (d *DuckDBDriver) TruncateTable(meta *model.TableMeta) error {
-
-	query := fmt.Sprintf("DELETE FROM %s", meta.TableName)
-
+	query := fmt.Sprintf("DROP TABLE IF EXISTS %s", meta.TableName)
 	_, err := d.db.Exec(query)
 	if err != nil {
-		return fmt.Errorf("duckdb truncate failed: %w", err)
+		return fmt.Errorf("duckdb drop table failed: %w", err)
 	}
 
-	return nil
+	return d.createTableInternal(meta)
 }
 
 func (d *DuckDBDriver) ImportDailyStocks(path string) error {
