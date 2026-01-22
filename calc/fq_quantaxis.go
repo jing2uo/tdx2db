@@ -162,7 +162,12 @@ func processFactorSymbol(fctx *FactorContext, symbol string) ([]model.Factor, er
 		basics := fctx.BasicsMap[symbol]
 
 		if state == nil {
-			// 新股：全量计算
+			// 没有新 basic → 停牌/退市，跳过
+			if len(basics) == 0 {
+				return nil, nil
+			}
+
+			// 有新 basic → 新股，全量计算
 			allBasics, err := fctx.DB.GetBasicsBySymbol(symbol)
 			if err != nil {
 				return nil, fmt.Errorf("query %s failed: %w", symbol, err)
