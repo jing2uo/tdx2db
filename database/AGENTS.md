@@ -31,11 +31,17 @@
 - Scheme determines driver: `clickhouse://` or `duckdb://`
 - CH defaults: user=default, password="", port=9000, http_port=8123
 
-**DataRepository interface:**
+**DataRepository interface (interface.go):**
 - `Connect()/Close()` - Lifecycle management
-- `InitSchema()` - Create tables + views
-- `Import*()` - CSV import methods
-- `Query/Get*()` - Read operations
+- `InitSchema()` - Create tables + views (auto-registered via model package)
+- `Import*()` - CSV import: DailyStocks, 1Min, 5Min, AdjustFactors, GBBQ, Basic, Holidays, BlocksInfo, BlocksMember
+- `TruncateTable(meta)` - Clear table (used by full-recalc tasks)
+- `Query()` - Generic query with conditions map
+- `QueryStockData()` - Date range filtered OHLCV data
+- `GetLatestDate()` - Used by cron for incremental updates
+- `GetAllSymbols()` - All distinct symbols
+- `GetBasicsBySymbol()` - StockBasic data for factor calculation
+- `GetGbbq()` - All gbbq records (loaded once, indexed in calc)
 
 **CH import (clickhouse/dml.go):**
 - HTTP POST to `/` endpoint
@@ -66,9 +72,10 @@
 ## NOTES
 
 **Table naming:**
-- `raw_*` - Imported data tables
-- `v_*` - Views (复权 calculations)
-- Views defined in ddl.go files
+- `raw_*` - Imported data tables (raw_stocks_daily, raw_stocks_basic, raw_adjust_factor, raw_gbbq, etc.)
+- `v_*` - Views (v_bfq_daily, v_qfq_daily, v_hfq_daily)
+- Tables auto-registered via `model.SchemaFromStruct()`, views via `model.DefineView()`
+- View implementations are driver-specific (registered in ddl.go via `registerViews()`)
 
 **Incremental update flow:**
 - `GetLatestDate()` → fetch delta from TDX → `Import*()` → Calculate factors

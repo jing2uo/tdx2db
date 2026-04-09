@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"math"
-	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
@@ -13,8 +12,7 @@ import (
 
 // FactorContext 处理上下文
 type FactorContext struct {
-	DB        database.DataRepository
-	GbbqIndex GbbqIndex
+	DB database.DataRepository
 }
 
 // ExportFactorsToCSV 导出后复权因子（每天一条记录，和日线对齐）
@@ -23,12 +21,6 @@ func ExportFactorsToCSV(
 	db database.DataRepository,
 	csvPath string,
 ) (int, error) {
-	gbbqData, err := db.GetGbbq()
-	if err != nil {
-		return 0, fmt.Errorf("failed to query gbbq: %w", err)
-	}
-	gbbqIndex := buildGbbqIndex(gbbqData)
-
 	symbols, err := db.GetAllSymbols()
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
@@ -45,8 +37,7 @@ func ExportFactorsToCSV(
 	defer cw.Close()
 
 	fctx := &FactorContext{
-		DB:        db,
-		GbbqIndex: gbbqIndex,
+		DB: db,
 	}
 
 	pipeline := utils.NewPipeline[string, model.Factor]()
@@ -79,8 +70,6 @@ func ExportFactorsToCSV(
 }
 
 func processFactorSymbol(fctx *FactorContext, symbol string) ([]model.Factor, error) {
-	xdxrs := fctx.GbbqIndex[symbol]
-
 	basics, err := fctx.DB.GetBasicsBySymbol(symbol)
 	if err != nil {
 		return nil, fmt.Errorf("query %s failed: %w", symbol, err)
@@ -89,16 +78,16 @@ func processFactorSymbol(fctx *FactorContext, symbol string) ([]model.Factor, er
 		return nil, nil
 	}
 
-	return calculateFullHfq(basics, xdxrs), nil
+	return calculateFullHfq(basics), nil
 }
 
 // calculateFullHfq 全量计算 HFQ（每天一条记录）
-func calculateFullHfq(basics []model.StockBasic, xdxrs []model.GbbqData) []model.Factor {
+// basic.PreClose 已包含除权调整，prevClose != PreClose 即为除权日，无需独立的 xdxr 日期集合
+func calculateFullHfq(basics []model.StockBasic) []model.Factor {
 	if len(basics) == 0 {
 		return nil
 	}
 
-	xdxrDates := buildXdxrDateSet(xdxrs)
 	results := make([]model.Factor, 0, len(basics))
 	currentHfq := 1.0
 	prevClose := basics[0].Close
@@ -110,10 +99,15 @@ func calculateFullHfq(basics []model.StockBasic, xdxrs []model.GbbqData) []model
 		HfqFactor: currentHfq,
 	})
 
-	// 后续每天
+	// 后续每天：通过 prevClose / PreClose 检测除权
 	for i := 1; i < len(basics); i++ {
 		basic := basics[i]
-		currentHfq = updateHfq(currentHfq, prevClose, basic, xdxrDates)
+		if basic.PreClose != 0 {
+			ratio := prevClose / basic.PreClose
+			if !floatEqual(ratio, 1.0) {
+				currentHfq *= ratio
+			}
+		}
 		results = append(results, model.Factor{
 			Symbol:    basic.Symbol,
 			Date:      basic.Date,
@@ -123,30 +117,6 @@ func calculateFullHfq(basics []model.StockBasic, xdxrs []model.GbbqData) []model
 	}
 
 	return results
-}
-
-// buildXdxrDateSet 构建 xdxr 日期集合
-func buildXdxrDateSet(xdxrs []model.GbbqData) map[time.Time]struct{} {
-	dates := make(map[time.Time]struct{})
-	for _, x := range xdxrs {
-		if x.Category == 1 {
-			dates[x.Date] = struct{}{}
-		}
-	}
-	return dates
-}
-
-// updateHfq 更新 HFQ（如果是除权日）
-func updateHfq(currentHfq, prevClose float64, basic model.StockBasic, xdxrDates map[time.Time]struct{}) float64 {
-	if _, isXdxr := xdxrDates[basic.Date]; isXdxr {
-		if basic.PreClose != 0 {
-			ratio := prevClose / basic.PreClose
-			if !floatEqual(ratio, 1.0) {
-				return currentHfq * ratio
-			}
-		}
-	}
-	return currentHfq
 }
 
 func floatEqual(a, b float64) bool {
