@@ -5,18 +5,11 @@ import (
 	"fmt"
 	"math"
 	"sort"
-	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
 	"github.com/jing2uo/tdx2db/utils"
 )
-
-type IncrementState struct {
-	PrevClose     float64
-	LastPostFloat float64
-	LastPostTotal float64
-}
 
 type xdxrInfo struct {
 	Fenhong     float64
@@ -26,13 +19,10 @@ type xdxrInfo struct {
 }
 
 type GbbqIndex map[string][]model.GbbqData
-type StateIndex map[string]*IncrementState
 
 type BasicContext struct {
-	DB         database.DataRepository
-	GbbqIndex  GbbqIndex
-	StateIndex StateIndex
-	StartDate  time.Time
+	DB        database.DataRepository
+	GbbqIndex GbbqIndex
 }
 
 // ExportStockBasicToCSV 计算并导出 StockBasic 数据
@@ -42,23 +32,11 @@ func ExportStockBasicToCSV(
 	csvPath string,
 ) (int, error) {
 
-	startDate, _ := db.GetLatestDate(model.TableBasic.TableName, "date")
-	isIncremental := !startDate.IsZero() && startDate.Year() > 1900
-
 	gbbqData, err := db.GetGbbq()
 	if err != nil {
 		return 0, fmt.Errorf("failed to query gbbq: %w", err)
 	}
 	gbbqIndex := buildGbbqIndex(gbbqData)
-
-	var stateIndex StateIndex
-	if isIncremental {
-		lastBasics, err := db.GetBasicsSince(startDate)
-		if err != nil {
-			return 0, fmt.Errorf("failed to query last basic state: %w", err)
-		}
-		stateIndex = buildStateIndex(lastBasics)
-	}
 
 	symbols, err := db.GetAllSymbols()
 	if err != nil {
@@ -72,10 +50,8 @@ func ExportStockBasicToCSV(
 	defer cw.Close()
 
 	basicCtx := &BasicContext{
-		DB:         db,
-		GbbqIndex:  gbbqIndex,
-		StateIndex: stateIndex,
-		StartDate:  startDate,
+		DB:        db,
+		GbbqIndex: gbbqIndex,
 	}
 
 	pipeline := utils.NewPipeline[string, model.StockBasic]()
@@ -108,15 +84,7 @@ func ExportStockBasicToCSV(
 }
 
 func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, error) {
-	isIncremental := !bc.StartDate.IsZero() && bc.StartDate.Year() > 1900
-
-	var queryStart *time.Time
-	if isIncremental {
-		t := bc.StartDate.AddDate(0, 0, 1)
-		queryStart = &t
-	}
-
-	stockData, err := bc.DB.QueryStockData(symbol, queryStart, nil)
+	stockData, err := bc.DB.QueryStockData(symbol, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("query stock %s failed: %w", symbol, err)
 	}
@@ -127,44 +95,7 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 
 	gbbqs := getGbbqBySymbol(bc.GbbqIndex, symbol)
 
-	if isIncremental {
-		var filtered []model.GbbqData
-		for _, g := range gbbqs {
-			if g.Date.After(bc.StartDate) {
-				filtered = append(filtered, g)
-			}
-		}
-		gbbqs = filtered
-	}
-
-	var initState *IncrementState
-
-	if isIncremental {
-		if state, exists := bc.StateIndex[symbol]; exists {
-			initState = state
-		} else {
-			lastRecords, err := bc.DB.GetLatestBasicBySymbol(symbol)
-			if err != nil {
-				return nil, fmt.Errorf("failed to fallback query for %s: %w", symbol, err)
-			}
-
-			if len(lastRecords) > 0 {
-				lastRecord := lastRecords[0]
-				var lastFloat, lastTotal float64
-				if lastRecord.Close > 0 {
-					lastFloat = lastRecord.FloatMV / lastRecord.Close / 10000
-					lastTotal = lastRecord.TotalMV / lastRecord.Close / 10000
-				}
-				initState = &IncrementState{
-					PrevClose:     lastRecord.Close,
-					LastPostFloat: lastFloat,
-					LastPostTotal: lastTotal,
-				}
-			}
-		}
-	}
-
-	basics, err := CalculateStockBasic(stockData, gbbqs, initState)
+	basics, err := CalculateStockBasic(stockData, gbbqs)
 	if err != nil {
 		return nil, fmt.Errorf("calc %s failed: %w", symbol, err)
 	}
@@ -180,7 +111,6 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 func CalculateStockBasic(
 	stockData []model.StockData,
 	gbbqData []model.GbbqData,
-	initialState *IncrementState,
 ) ([]*model.StockBasic, error) {
 
 	if len(stockData) == 0 {
@@ -220,15 +150,32 @@ func CalculateStockBasic(
 		return sharesList[i].Date.Before(sharesList[j].Date)
 	})
 
-	var currentFloat float64 = 0
-	var currentTotal float64 = 0
-	if initialState != nil {
-		currentFloat = initialState.LastPostFloat
-		currentTotal = initialState.LastPostTotal
-	}
-
 	shareIdx := 0
 	shareLen := len(sharesList)
+
+	var currentFloat float64 = 0
+	var currentTotal float64 = 0
+
+	// gbbq 不一定记录上市时的初始股本，第一条股本变动记录的 C1/C2
+	// 携带了"变动前"的流通盘/总股本，可用于回填 stockData 开头到该记录之间的值。
+	if shareLen > 0 && sharesList[0].Date.After(stockData[0].Date) {
+		first := sharesList[0]
+		if first.C1 > 0 {
+			currentFloat = first.C1
+			currentTotal = first.C2
+		} else if first.C3 > 0 {
+			currentFloat = first.C3
+			currentTotal = first.C4
+		} else {
+			for _, s := range sharesList {
+				if s.C3 > 0 {
+					currentFloat = s.C3
+					currentTotal = s.C4
+					break
+				}
+			}
+		}
+	}
 
 	for i, sd := range stockData {
 		basic := &model.StockBasic{
@@ -239,11 +186,7 @@ func CalculateStockBasic(
 
 		var prevClose float64
 		if i == 0 {
-			if initialState != nil {
-				prevClose = initialState.PrevClose
-			} else {
-				prevClose = sd.Close
-			}
+			prevClose = sd.Close
 		} else {
 			prevClose = stockData[i-1].Close
 		}
@@ -287,24 +230,6 @@ func buildGbbqIndex(data []model.GbbqData) GbbqIndex {
 	index := make(GbbqIndex)
 	for _, d := range data {
 		index[d.Symbol] = append(index[d.Symbol], d)
-	}
-	return index
-}
-
-func buildStateIndex(rows []model.StockBasic) StateIndex {
-	index := make(StateIndex, len(rows))
-	for _, row := range rows {
-		if row.Close == 0 {
-			continue
-		}
-		lastPostFloat := row.FloatMV / row.Close / 10000
-		lastPostTotal := row.TotalMV / row.Close / 10000
-
-		index[row.Symbol] = &IncrementState{
-			PrevClose:     row.Close,
-			LastPostFloat: lastPostFloat,
-			LastPostTotal: lastPostTotal,
-		}
 	}
 	return index
 }

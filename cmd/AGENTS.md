@@ -1,14 +1,14 @@
 # CLI COMMANDS
 
-**Purpose:** Cobra CLI commands (init, cron, convert)
+**Purpose:** Cobra CLI commands (init, cron, convert) — thin wrappers over workflow engine
 
 ## STRUCTURE
 ```
 ./cmd/
-├── common.go     # Shared constants (prefixes, paths)
-├── init.go       # Full import (calls workflow)
-├── cron.go       # Incremental update (calls workflow)
-└── convert.go    # TDX to CSV conversion
+├── common.go     # Shared constants (prefixes, paths, GetToday)
+├── init.go       # Full import (calls workflow with init tasks)
+├── cron.go       # Incremental update (calls workflow with update tasks)
+└── convert.go    # TDX to CSV conversion (standalone, no DB)
 ```
 
 ## WHERE TO LOOK
@@ -46,16 +46,19 @@
 4. `tdx.ConvertFilesToCSV()` → TempDir/stock.csv
 5. `db.ImportDailyStocks()`
 
-**cron command flow:**
-1. Get `db.GetLatestDate()` for incremental range
-2. Fetch delta from TDX (or full if new)
-3. Import daily + minute (if --minline set)
-4. Calculate adjust factors via `calc/`
+**cron command flow (cmd/cron.go):**
+1. Create DB + Connect + InitSchema
+2. Build TaskExecutor with all registered tasks
+3. Run `GetUpdateTaskNames()` → DAG execution:
+   - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
+   - Optional: `update_1min`, `update_5min`, `update_blocks` (via --minline, --tdxhome)
+4. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**
 - Types: `day`, `1min`, `5min`, `tic4`, `day4`
 - Input: directory or zip file
 - Output: CSV files
+- Standalone: no database connection needed
 
 ## ANTI-PATTERNS
 

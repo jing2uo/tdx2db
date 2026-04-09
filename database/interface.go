@@ -29,11 +29,7 @@ type DataRepository interface {
 	GetAllSymbols() ([]string, error)
 	CountStocksDaily() (int64, error)
 
-
 	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
-	GetLatestBasicBySymbol(symbol string) ([]model.StockBasic, error)
-	GetBasicsSince(sinceDate time.Time) ([]model.StockBasic, error)
 
 	GetGbbq() ([]model.GbbqData, error)
-	GetLatestFactors() ([]model.Factor, error)
 }

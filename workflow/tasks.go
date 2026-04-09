@@ -188,6 +188,7 @@ func executeCalcBasic(ctx context.Context, db database.DataRepository, args *Tas
 		return &TaskResult{State: StateSkipped, Message: "no new basic data"}, nil
 	}
 
+	db.TruncateTable(model.TableBasic)
 	if err := db.ImportBasic(basicCSV); err != nil {
 		return nil, fmt.Errorf("failed to import basic data: %w", err)
 	}
@@ -209,6 +210,7 @@ func executeCalcFactor(ctx context.Context, db database.DataRepository, args *Ta
 		return &TaskResult{State: StateSkipped, Message: "no new factor data"}, nil
 	}
 
+	db.TruncateTable(model.TableAdjustFactor)
 	if err := db.ImportAdjustFactors(factorCSV); err != nil {
 		return nil, fmt.Errorf("failed to append factor data: %w", err)
 	}

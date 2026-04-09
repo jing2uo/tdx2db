@@ -182,37 +182,6 @@ func (d *DuckDBDriver) GetBasicsBySymbol(symbol string) ([]model.StockBasic, err
 	return results, nil
 }
 
-func (d *DuckDBDriver) GetLatestBasicBySymbol(symbol string) ([]model.StockBasic, error) {
-	query := fmt.Sprintf(
-		"SELECT * FROM %s WHERE symbol = ? ORDER BY date DESC LIMIT 1",
-		model.TableBasic.TableName,
-	)
-
-	var results []model.StockBasic
-	if err := d.db.Select(&results, query, symbol); err != nil {
-		return nil, fmt.Errorf("failed to query latest daily basic by symbol %s: %w", symbol, err)
-	}
-
-	return results, nil
-}
-
-// GetBasicsSince 获取指定日期及之后的所有 basic
-func (d *DuckDBDriver) GetBasicsSince(sinceDate time.Time) ([]model.StockBasic, error) {
-	table := model.TableBasic.TableName
-
-	query := fmt.Sprintf(`
-		SELECT date, symbol, close, preclose, turnover, floatmv, totalmv
-		FROM %s WHERE date >= ? ORDER BY symbol, date
-	`, table)
-
-	var results []model.StockBasic
-	if err := d.db.Select(&results, query, sinceDate); err != nil {
-		return nil, fmt.Errorf("failed to query basics since %v: %w", sinceDate, err)
-	}
-
-	return results, nil
-}
-
 func (d *DuckDBDriver) GetGbbq() ([]model.GbbqData, error) {
 	table := model.TableGbbq.TableName
 
@@ -221,23 +190,6 @@ func (d *DuckDBDriver) GetGbbq() ([]model.GbbqData, error) {
 	var results []model.GbbqData
 	if err := d.db.Select(&results, query); err != nil {
 		return nil, fmt.Errorf("failed to query gbbq: %w", err)
-	}
-
-	return results, nil
-}
-
-func (d *DuckDBDriver) GetLatestFactors() ([]model.Factor, error) {
-	table := model.TableAdjustFactor.TableName
-
-	query := fmt.Sprintf(`
-		SELECT symbol, date, hfq_factor
-		FROM %s
-		QUALIFY ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY date DESC) = 1
-	`, table)
-
-	var results []model.Factor
-	if err := d.db.Select(&results, query); err != nil {
-		return nil, fmt.Errorf("failed to query latest factors: %w", err)
 	}
 
 	return results, nil
