@@ -10,11 +10,8 @@ builds:
     binary: tdx2db
     goos:
       - linux
-      - darwin
-      - windows
     goarch:
       - amd64
-      - arm64
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
 
@@ -47,7 +44,6 @@ dockers_v2:
     dockerfile: ./Containerfile
     platforms:
       - linux/amd64
-      - linux/arm64
     images:
       - "ghcr.io/jing2uo/tdx2db"
     tags:
