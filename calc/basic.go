@@ -11,12 +11,6 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-type IncrementState struct {
-	PrevClose     float64
-	LastPostFloat float64
-	LastPostTotal float64
-}
-
 type xdxrInfo struct {
 	Fenhong     float64
 	Peigu       float64
@@ -101,7 +95,7 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 
 	gbbqs := getGbbqBySymbol(bc.GbbqIndex, symbol)
 
-	basics, err := CalculateStockBasic(stockData, gbbqs, nil)
+	basics, err := CalculateStockBasic(stockData, gbbqs)
 	if err != nil {
 		return nil, fmt.Errorf("calc %s failed: %w", symbol, err)
 	}
@@ -117,7 +111,6 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 func CalculateStockBasic(
 	stockData []model.StockData,
 	gbbqData []model.GbbqData,
-	initialState *IncrementState,
 ) ([]*model.StockBasic, error) {
 
 	if len(stockData) == 0 {
@@ -157,15 +150,32 @@ func CalculateStockBasic(
 		return sharesList[i].Date.Before(sharesList[j].Date)
 	})
 
-	var currentFloat float64 = 0
-	var currentTotal float64 = 0
-	if initialState != nil {
-		currentFloat = initialState.LastPostFloat
-		currentTotal = initialState.LastPostTotal
-	}
-
 	shareIdx := 0
 	shareLen := len(sharesList)
+
+	var currentFloat float64 = 0
+	var currentTotal float64 = 0
+
+	// gbbq 不一定记录上市时的初始股本，第一条股本变动记录的 C1/C2
+	// 携带了"变动前"的流通盘/总股本，可用于回填 stockData 开头到该记录之间的值。
+	if shareLen > 0 && sharesList[0].Date.After(stockData[0].Date) {
+		first := sharesList[0]
+		if first.C1 > 0 {
+			currentFloat = first.C1
+			currentTotal = first.C2
+		} else if first.C3 > 0 {
+			currentFloat = first.C3
+			currentTotal = first.C4
+		} else {
+			for _, s := range sharesList {
+				if s.C3 > 0 {
+					currentFloat = s.C3
+					currentTotal = s.C4
+					break
+				}
+			}
+		}
+	}
 
 	for i, sd := range stockData {
 		basic := &model.StockBasic{
@@ -176,11 +186,7 @@ func CalculateStockBasic(
 
 		var prevClose float64
 		if i == 0 {
-			if initialState != nil {
-				prevClose = initialState.PrevClose
-			} else {
-				prevClose = sd.Close
-			}
+			prevClose = sd.Close
 		} else {
 			prevClose = stockData[i-1].Close
 		}
