@@ -126,6 +126,8 @@ func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
 		amount := math.Float32frombits(amountBits)
 
 		volRaw := binary.LittleEndian.Uint32(data[offset+24 : offset+28])
+		reserved := binary.LittleEndian.Uint32(data[offset+28 : offset+32])
+		volume := parseVolumeOverflow(volRaw, reserved)
 
 		t, err := parseDate(dateRaw)
 		if err != nil {
@@ -139,7 +141,7 @@ func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
 			Low:    float64(lowRaw) / 100.0,
 			Close:  float64(closeRaw) / 100.0,
 			Amount: float64(amount),
-			Volume: int64(volRaw),
+			Volume: volume,
 			Date:   t,
 		})
 	}
@@ -197,6 +199,18 @@ func parseDate(d uint32) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("invalid date")
 	}
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local), nil
+}
+
+// parseVolumeOverflow 处理成交量溢出
+// TDX day 文件中 volume 字段是 uint32，最大约 4.29 亿
+// 当成交量超过此限制时，使用特殊编码:
+//   - reserved (bytes 28-31) 正常值为 0x10000
+//   - 溢出时: volume = volume_raw * 100 + (reserved & 0xFF)
+func parseVolumeOverflow(volRaw, reserved uint32) int64 {
+	if reserved == 0x10000 {
+		return int64(volRaw) // 正常情况
+	}
+	return int64(volRaw*100 + (reserved & 0xFF))
 }
 
 func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
