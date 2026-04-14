@@ -21,6 +21,11 @@ jobs:
             goarch: amd64
             ext: ""
             prepare: true
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            ext: ""
+            prepare: true
           - os: macos-14
             goos: darwin
             goarch: arm64
