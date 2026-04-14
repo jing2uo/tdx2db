@@ -62,17 +62,13 @@ func NativeDayMerge(vipdocDir string) error {
 		codFile := filepath.Join(refmhqDir, strings.TrimSuffix(baseName, ".md1")+".cod")
 
 		if _, err := os.Stat(codFile); os.IsNotExist(err) {
-			fmt.Printf("⚠️ skipping %s: no matching .cod file\n", baseName)
 			continue
 		}
 
 		exchange, dateVal, err := parseIncrFilename(baseName)
 		if err != nil {
-			fmt.Printf("⚠️ skipping %s: %v\n", baseName, err)
 			continue
 		}
-
-		fmt.Printf("📦 merging %s (%s %d)\n", baseName, exchange, dateVal)
 
 		if err := mergeSingleDay(vipdocDir, exchange, dateVal, codFile, md1File); err != nil {
 			return fmt.Errorf("merge %s failed: %w", baseName, err)
@@ -224,24 +220,17 @@ func mergeSingleDay(vipdocDir, exchange string, date uint32, codFile, md1File st
 		return fmt.Errorf("create lday dir: %w", err)
 	}
 
-	merged, skipped := 0, 0
-
 	for _, ent := range entries {
 		ohlcv, err := readMd1Block(md1Data, ent.SeqNum)
 		if err != nil {
-			skipped++
 			continue
 		}
 
-		// Skip securities with no trading activity
 		if ohlcv.Volume == 0 && ohlcv.Amount == 0 {
-			skipped++
 			continue
 		}
 
-		// Skip records with invalid prices
 		if ohlcv.Open <= 0 || ohlcv.Close <= 0 {
-			skipped++
 			continue
 		}
 
@@ -251,14 +240,10 @@ func mergeSingleDay(vipdocDir, exchange string, date uint32, codFile, md1File st
 		dayRec := makeDayRecord(date, ohlcv)
 
 		if err := appendDayRecord(dayFilePath, date, dayRec); err != nil {
-			fmt.Printf("⚠️ failed to write %s: %v\n", dayFileName, err)
 			continue
 		}
-
-		merged++
 	}
 
-	fmt.Printf("✅ %s %d: merged %d, skipped %d\n", exchange, date, merged, skipped)
 	return nil
 }
 
