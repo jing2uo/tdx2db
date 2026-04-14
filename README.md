@@ -30,15 +30,17 @@
 
 ### 使用二进制
 
-从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载，解压后移至 `$PATH`，二进制**仅支持在 x86 Linux 中**直接使用：
+从 [releases](https://github.com/jing2uo/tdx2db/releases) 下载对应平台的压缩包，解压后移至 `$PATH`：
 
 ```bash
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 ```
 
+目前提供 Linux (amd64/arm64)、macOS (arm64)、Windows (amd64) 预编译二进制。其中分钟线、分笔数据的合并目前仅在 Linux 上支持，Windows / macOS 会跳过这两类数据，日线正常处理。
+
 ### 使用 docker
 
-项目会利用 github action 构建容器镜像，windows 和 mac 可以通过 docker 使用:
+项目会利用 github action 构建容器镜像，也可以通过 docker 使用:
 
 ```bash
 docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
@@ -183,3 +185,7 @@ tdx2db convert -h   # 其他类型查看 help
 ## 欢迎 issue 和 pr
 
 有任何使用问题都可以开 issue 讨论，也期待 pr~
+
+## 致谢
+
+- Windows 和 macOS 下的日线合并由 [@Abelonx](https://github.com/Abelonx) 在 [#60](https://github.com/jing2uo/tdx2db/pull/60) 贡献的 native Go 实现支持，让 tdx2db 摆脱了对 Linux datatool 二进制的依赖。
