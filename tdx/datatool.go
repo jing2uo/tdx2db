@@ -16,14 +16,29 @@ var embedFS embed.FS
 var startDateStr = "19901201"
 
 // DatatoolCreate merges TDX incremental data into per-stock files.
+//
+// On Linux, all subcommands use the embedded external datatool binary.
+// On Windows/macOS, "day" uses the native Go implementation (NativeDayMerge),
+// and "min"/"tick" print a notice and skip, since only "day" has a native port.
 func DatatoolCreate(cacheDir, subCommand string, endDate time.Time) error {
 	switch subCommand {
 	case "day", "min", "tick":
-		//
 	default:
 		return errors.New("unsupported datatool subcommand: " + subCommand)
 	}
 
+	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
+		if subCommand == "day" {
+			return NativeDayMerge(filepath.Join(cacheDir, "vipdoc"))
+		}
+		fmt.Printf("⚠️  %s 子命令暂不支持 %s，已跳过\n", subCommand, runtime.GOOS)
+		return nil
+	}
+
+	return datatoolExec(cacheDir, subCommand, endDate)
+}
+
+func datatoolExec(cacheDir, subCommand string, endDate time.Time) error {
 	toolPath, err := extractDatatool(cacheDir)
 	if err != nil {
 		return fmt.Errorf("failed to extract datatool: %w", err)

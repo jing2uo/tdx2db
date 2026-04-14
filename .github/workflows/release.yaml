@@ -1,32 +1,151 @@
-name: Release with GoReleaser
+name: Release
 
 on:
   push:
     tags:
-      - "v*" # 触发条件：推送到以 v 开头的标签（如 v1.0.0）
+      - "v*"
 
 permissions:
   contents: write
-  packages: write # 必须：发布到 ghcr.io
+  packages: write
 
 jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            os_title: Linux
+            arch_title: x86_64
+            ext: ""
+            archive: tar.gz
+            prepare: true
+          - os: macos-14
+            goos: darwin
+            goarch: arm64
+            os_title: Darwin
+            arch_title: arm64
+            ext: ""
+            archive: tar.gz
+          - os: windows-latest
+            goos: windows
+            goarch: amd64
+            os_title: Windows
+            arch_title: x86_64
+            ext: ".exe"
+            archive: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Prepare datatool (linux only)
+        if: matrix.prepare
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unrar
+          make prepare
+
+      - name: Build
+        shell: bash
+        env:
+          CGO_ENABLED: "1"
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          go build \
+            -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" \
+            -o tdx2db${{ matrix.ext }} ./main.go
+
+      - name: Archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          NAME="tdx2db_${{ matrix.os_title }}_${{ matrix.arch_title }}"
+          tar -czf "${NAME}.tar.gz" tdx2db${{ matrix.ext }}
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        shell: bash
+        run: |
+          NAME="tdx2db_${{ matrix.os_title }}_${{ matrix.arch_title }}"
+          7z a "${NAME}.zip" tdx2db${{ matrix.ext }}
+
+      - name: Upload archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: tdx2db_*.*
+          if-no-files-found: error
+          retention-days: 1
+
   release:
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # 获取完整历史以生成 changelog
+          fetch-depth: 0
 
-      - name: Install unrar
-        run: sudo apt-get update && sudo apt-get install -y unrar
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - name: Download archives
+        uses: actions/download-artifact@v4
         with:
-          go-version: "1.25" # 替换为你使用的 Go 版本
+          path: archives
+          pattern: archive-*
+          merge-multiple: true
 
-      - name: Log in to GitHub Container Registry
+      - name: Determine pre-release
+        id: prerel
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *-* ]]; then
+            echo "flag=--prerelease" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=--latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            archives/tdx2db_*.* \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            ${{ steps.prerel.outputs.flag }}
+
+  docker:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download linux archive
+        uses: actions/download-artifact@v4
+        with:
+          name: archive-linux-amd64
+          path: .
+
+      - name: Extract binary
+        run: |
+          mkdir -p linux/amd64
+          tar -xzf tdx2db_Linux_x86_64.tar.gz
+          mv tdx2db linux/amd64/tdx2db
+
+      - name: Log in to ghcr.io
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -34,12 +153,30 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
-      - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v6
+      - name: Compute tags
+        id: tags
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          IMAGE="ghcr.io/jing2uo/tdx2db"
+          TAGS="${IMAGE}:${VERSION}"
+          if [[ "${GITHUB_REF_NAME}" != *-* ]]; then
+            TAGS="${TAGS},${IMAGE}:latest"
+          fi
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
         with:
-          version: latest
-          args: release --clean
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          context: .
+          file: ./Containerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.tags.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=tdx2db
+            org.opencontainers.image.description=Convert and import TDX data into DuckDB
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
