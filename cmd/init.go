@@ -42,11 +42,10 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
-		DayFileDir:    dayFileDir,
-		TempDir:       TempDir,
-		VipdocDir:     VipdocDir,
-		ValidPrefixes: ValidPrefixes,
-		Today:         GetToday(),
+		DayFileDir: dayFileDir,
+		TempDir:    TempDir,
+		VipdocDir:  VipdocDir,
+		Today:      GetToday(),
 	}
 
 	taskNames := workflow.GetInitTaskNames()

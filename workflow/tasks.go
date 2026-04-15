@@ -124,7 +124,7 @@ func executeDailyImport(ctx context.Context, db database.DataRepository, args *T
 
 	stockDailyCSV := filepath.Join(args.TempDir, "stock.csv")
 
-	_, err := tdx.ConvertFilesToCSV(ctx, sourceDir, args.ValidPrefixes, stockDailyCSV, ".day")
+	_, err := tdx.ConvertFilesToCSV(ctx, sourceDir, stockDailyCSV, ".day")
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert day files to csv: %w", err)
 	}
@@ -242,7 +242,7 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 
 		stock1MinCSV := filepath.Join(args.TempDir, "1min.csv")
 
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, args.ValidPrefixes, stock1MinCSV, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock1MinCSV, ".01")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert .01 files to csv: %w", err)
 		}
@@ -278,7 +278,7 @@ func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *Ta
 
 		stock5MinCSV := filepath.Join(args.TempDir, "5min.csv")
 
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, args.ValidPrefixes, stock5MinCSV, ".5")
+		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock5MinCSV, ".5")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert .5 files to csv: %w", err)
 		}

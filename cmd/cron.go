@@ -31,12 +31,11 @@ func Cron(ctx context.Context, dbURI, minline, tdxhome string) error {
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
-		Minline:       minline,
-		TdxHome:       tdxhome,
-		TempDir:       TempDir,
-		VipdocDir:     VipdocDir,
-		ValidPrefixes: ValidPrefixes,
-		Today:         GetToday(),
+		Minline:   minline,
+		TdxHome:   tdxhome,
+		TempDir:   TempDir,
+		VipdocDir: VipdocDir,
+		Today:     GetToday(),
 	}
 
 	taskNames := workflow.GetUpdateTaskNames()

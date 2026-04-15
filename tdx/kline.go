@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -19,12 +20,12 @@ const (
 )
 
 // ConvertFilesToCSV 转换 TDX 文件到 CSV
-func ConvertFilesToCSV(ctx context.Context, inputDir string, validPrefixes []string, outputFile string, suffix string) (string, error) {
+func ConvertFilesToCSV(ctx context.Context, inputDir string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
-		return runConversion[model.KlineDay](ctx, inputDir, validPrefixes, outputFile, suffix, processDayFile)
+		return runConversion[model.KlineDay](ctx, inputDir, outputFile, suffix, processDayFile)
 	case ".01", ".5":
-		return runConversion[model.KlineMin](ctx, inputDir, validPrefixes, outputFile, suffix, processMinFile)
+		return runConversion[model.KlineMin](ctx, inputDir, outputFile, suffix, processMinFile)
 	default:
 		return "", fmt.Errorf("unsupported suffix: %s", suffix)
 	}
@@ -33,13 +34,12 @@ func ConvertFilesToCSV(ctx context.Context, inputDir string, validPrefixes []str
 func runConversion[T any](
 	ctx context.Context,
 	inputDir string,
-	validPrefixes []string,
 	outputFile string,
 	suffix string,
 	parser func([]byte, string) ([]T, error),
 ) (string, error) {
 
-	files, err := collectFiles(inputDir, validPrefixes, suffix)
+	files, err := collectFiles(inputDir, suffix)
 	if err != nil {
 		return "", err
 	}
@@ -226,7 +226,10 @@ func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
 	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.Local), nil
 }
 
-func collectFiles(root string, prefixes []string, suffix string) ([]string, error) {
+// symbolPattern 合法 symbol 格式: 市场前缀 + 纯数字 (sh600000 / sz000001 / bj830000)
+var symbolPattern = regexp.MustCompile(`^(sh|sz|bj)\d+$`)
+
+func collectFiles(root string, suffix string) ([]string, error) {
 	var files []string
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -235,20 +238,7 @@ func collectFiles(root string, prefixes []string, suffix string) ([]string, erro
 		if !d.IsDir() && strings.HasSuffix(path, suffix) {
 			fname := filepath.Base(path)
 			symbol := strings.TrimSuffix(fname, suffix)
-
-			match := false
-			if len(prefixes) == 0 {
-				match = true
-			} else {
-				for _, p := range prefixes {
-					if strings.HasPrefix(symbol, p) {
-						match = true
-						break
-					}
-				}
-			}
-
-			if match {
+			if symbolPattern.MatchString(symbol) {
 				files = append(files, path)
 			}
 		}
