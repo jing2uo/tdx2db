@@ -32,13 +32,27 @@ func Cron(ctx context.Context, dbURI, minline string) error {
 		return err
 	}
 
+	today := GetToday()
+
+	plan, err := workflow.BuildWorkPlan(db, today)
+	if err != nil {
+		return err
+	}
+	if plan.Reason != "" {
+		fmt.Println(plan.Reason)
+	}
+	if !plan.AnyNeeded() {
+		return nil
+	}
+
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
 		Minline:   minline,
 		TempDir:   TempDir,
 		VipdocDir: VipdocDir,
-		Today:     GetToday(),
+		Today:     today,
+		Plan:      plan,
 	}
 
 	taskNames := workflow.GetUpdateTaskNames()

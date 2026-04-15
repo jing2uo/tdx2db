@@ -245,6 +245,15 @@ func (d *ClickHouseDriver) GetGbbq() ([]model.GbbqData, error) {
 	return results, nil
 }
 
+func (d *ClickHouseDriver) GetHolidays() ([]time.Time, error) {
+	query := fmt.Sprintf("SELECT date FROM %s ORDER BY date", model.TableHoliday.TableName)
+	var dates []time.Time
+	if err := d.db.Select(&dates, query); err != nil {
+		return nil, fmt.Errorf("failed to query holidays: %w", err)
+	}
+	return dates, nil
+}
+
 const chMetaTable = "_meta"
 
 func (d *ClickHouseDriver) ReadSchemaVersion() (string, error) {

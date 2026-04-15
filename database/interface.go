@@ -34,4 +34,5 @@ type DataRepository interface {
 	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
 
 	GetGbbq() ([]model.GbbqData, error)
+	GetHolidays() ([]time.Time, error)
 }
