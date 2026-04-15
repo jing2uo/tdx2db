@@ -202,7 +202,7 @@ func parseDate(d uint32) (time.Time, error) {
 }
 
 // parseVolumeOverflow 处理成交量溢出
-// TDX day 文件中 volume 字段是 uint32，最大约 4.29 亿
+// TDX day 文件中 volume 字段是 uint32，最大约 42.9 亿
 // 当成交量超过此限制时，使用特殊编码:
 //   - reserved (bytes 28-31) 正常值为 0x10000
 //   - 溢出时: volume = volume_raw * 100 + (reserved & 0xFF)
@@ -210,7 +210,7 @@ func parseVolumeOverflow(volRaw, reserved uint32) int64 {
 	if reserved == 0x10000 {
 		return int64(volRaw) // 正常情况
 	}
-	return int64(volRaw*100 + (reserved & 0xFF))
+	return int64(volRaw)*100 + int64(reserved&0xFF)
 }
 
 func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
