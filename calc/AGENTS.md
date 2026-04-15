@@ -27,7 +27,7 @@
 ## DATA FLOW
 
 ```
-DB: raw_stocks_daily + raw_gbbq
+DB: raw_kline_daily + raw_gbbq
         │
         ├──► calc/basic.go ──► raw_stocks_basic (preclose, turnover, floatmv, totalmv)
         │

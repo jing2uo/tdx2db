@@ -38,7 +38,7 @@
 
 **Pipeline usage:**
 - `ConvertFilesToCSV()` uses `utils.Pipeline` for concurrent file processing
-- Files filtered by `validPrefixes` before parsing
+- Files filtered by `^(sh|sz|bj)\d+$` regex — full ingest, no prefix whitelist
 - Context cancellation checked in loops
 
 ## ANTI-PATTERNS

@@ -16,7 +16,7 @@
 
 - **增量更新**: 支持间隔数天后数据补全，维护简单
 - **分时数据**: 支持导入 1min 和 5min 分时数据
-- **复权计算**: 自动计算前后复权因子，且因子支持分时使用
+- **复权计算**: 自动计算前后复权因子，因子支持分时使用
 - **衍生指标**: 自动计算换手率和市值信息
 - **稳定可靠**: 基于通达信数据，不依赖收费或限流接口
 
@@ -36,7 +36,7 @@
 sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 ```
 
-目前提供 Linux (amd64/arm64)、macOS (arm64)、Windows (amd64) 预编译二进制。其中分钟线、分笔数据的合并目前仅在 Linux 上支持，Windows / macOS 会跳过这两类数据，日线正常处理。
+目前提供 Linux (amd64/arm64)、macOS (arm64)、Windows (amd64) 预编译二进制。其中分钟数据目前仅在 Linux 上支持，Windows / macOS 会跳过分时数据，日线正常处理。
 
 ### 使用 docker
 
@@ -129,7 +129,7 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 
 1. 分时数据下载和导入耗时，表数据量大
 2. 通达信没提供历史分时数据，请自行检索后导入
-3. 更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
+3. 分时更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
 ### 拓展数据
@@ -147,12 +147,15 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 
 | 表/视图名               | 说明                          |
 | :---------------------- | :---------------------------- |
+| `_meta`                 | 元信息 (schema 版本等)        |
 | `raw_adjust_factor`     | 复权因子表                    |
+| `raw_gbbq`              | 股本变迁数据                  |
 | `raw_holidays`          | 假期日历                      |
-| `raw_stocks_1min`       | 1 分钟 K 线                   |
-| `raw_stocks_5min`       | 5 分钟 K 线                   |
-| `raw_stocks_basic`      | 前收盘价、换手率与市值        |
-| `raw_stocks_daily`      | 股票日线数据                  |
+| `raw_kline_1min`        | 1 分钟 K 线                   |
+| `raw_kline_5min`        | 5 分钟 K 线                   |
+| `raw_kline_daily`       | 日线数据 (股票/指数/ETF/板块) |
+| `raw_stocks_basic`      | 股票前收盘价、换手率与市值    |
+| `raw_symbol_class`      | 品种分类 (stock/index/etf/等) |
 | `raw_tdx_blocks_info`   | 概念、风格、行业板块信息      |
 | `raw_tdx_blocks_member` | 板块成分                      |
 | `v_bfq_daily`           | 不复权日线，包含 stocks_basic |
@@ -180,12 +183,11 @@ tdx2db convert -t day -i ./vipdoc/ -o ./   # 转换 .day 日线文件
 tdx2db convert -h   # 其他类型查看 help
 ```
 
-日线转换会查找目录中所有文件，包括指数、板块等，分时只处理股票。
+## 致谢
+
+- Windows 和 macOS 下的日线合并由 [@Abelonx](https://github.com/Abelonx) 在 [#60](https://github.com/jing2uo/tdx2db/pull/60) 贡献的 native Go 实现支持，让 tdx2db 摆脱了对 Linux datatool 二进制的依赖。
+
 
 ## 欢迎 issue 和 pr
 
 有任何使用问题都可以开 issue 讨论，也期待 pr~
-
-## 致谢
-
-- Windows 和 macOS 下的日线合并由 [@Abelonx](https://github.com/Abelonx) 在 [#60](https://github.com/jing2uo/tdx2db/pull/60) 贡献的 native Go 实现支持，让 tdx2db 摆脱了对 Linux datatool 二进制的依赖。

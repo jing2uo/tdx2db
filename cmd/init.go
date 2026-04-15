@@ -24,11 +24,15 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	if err := writeSchemaVersion(db); err != nil {
+		return err
+	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	count, err := db.CountStocksDaily()
+	count, err := db.CountKlineDaily()
 	if err != nil {
 		return fmt.Errorf("failed to check database status: %w", err)
 	}
@@ -42,11 +46,10 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 	executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 
 	args := &workflow.TaskArgs{
-		DayFileDir:    dayFileDir,
-		TempDir:       TempDir,
-		VipdocDir:     VipdocDir,
-		ValidPrefixes: ValidPrefixes,
-		Today:         GetToday(),
+		DayFileDir: dayFileDir,
+		TempDir:    TempDir,
+		VipdocDir:  VipdocDir,
+		Today:      GetToday(),
 	}
 
 	taskNames := workflow.GetInitTaskNames()

@@ -107,24 +107,34 @@ func SchemaFromStruct(tableName string, model interface{}, orderByKey []string) 
 	return meta
 }
 
-// --- 表结构元数据 (TableMeta) ---
+var MetaTable = SchemaFromStruct(
+	"_meta",
+	Meta{},
+	[]string{"key"},
+)
 
-var TableStocksDaily = SchemaFromStruct(
-	"raw_stocks_daily",
-	StockData{},
+var TableKlineDaily = SchemaFromStruct(
+	"raw_kline_daily",
+	KlineDay{},
 	[]string{"symbol", "date"},
 )
 
-var TableStocks1Min = SchemaFromStruct(
-	"raw_stocks_1min",
-	StockMinData{},
+var TableKline1Min = SchemaFromStruct(
+	"raw_kline_1min",
+	KlineMin{},
 	[]string{"symbol", "datetime"},
 )
 
-var TableStocks5Min = SchemaFromStruct(
-	"raw_stocks_5min",
-	StockMinData{},
+var TableKline5Min = SchemaFromStruct(
+	"raw_kline_5min",
+	KlineMin{},
 	[]string{"symbol", "datetime"},
+)
+
+var TableSymbolClass = SchemaFromStruct(
+	"raw_symbol_class",
+	SymbolClass{},
+	[]string{"symbol"},
 )
 
 var TableAdjustFactor = SchemaFromStruct(

@@ -59,7 +59,6 @@ TaskUpdate1Min = &Task{
 - `TdxHome` - 通达信安装目录
 - `TempDir`, `VipdocDir` - Temp directories
 - `DayFileDir` - User-provided TDX data directory (for init)
-- `ValidPrefixes` - Market/Index/Block prefixes (passed from cmd)
 - `Today` - Current date for incremental updates
 
 ## ANTI-PATTERNS
@@ -94,11 +93,10 @@ TaskUpdate1Min = &Task{
 ```go
 executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 args := &workflow.TaskArgs{
-    DayFileDir:    dayFileDir,
-    TempDir:       TempDir,
-    VipdocDir:     VipdocDir,
-    ValidPrefixes: ValidPrefixes,
-    Today:         GetToday(),
+    DayFileDir: dayFileDir,
+    TempDir:    TempDir,
+    VipdocDir:  VipdocDir,
+    Today:      GetToday(),
 }
 executor.Run(ctx, workflow.GetInitTaskNames(), args)
 ```
@@ -107,12 +105,11 @@ executor.Run(ctx, workflow.GetInitTaskNames(), args)
 ```go
 executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 args := &workflow.TaskArgs{
-    Minline:       minline,
-    TdxHome:       tdxhome,
-    TempDir:       TempDir,
-    VipdocDir:     VipdocDir,
-    ValidPrefixes: ValidPrefixes,
-    Today:         GetToday(),
+    Minline:   minline,
+    TdxHome:   tdxhome,
+    TempDir:   TempDir,
+    VipdocDir: VipdocDir,
+    Today:     GetToday(),
 }
 executor.Run(ctx, workflow.GetUpdateTaskNames(), args)
 ```

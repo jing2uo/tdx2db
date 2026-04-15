@@ -57,7 +57,6 @@ type TaskArgs struct {
 	TempDir       string
 	VipdocDir     string
 	DayFileDir    string
-	ValidPrefixes []string
 	Today         time.Time
 	Extra         map[string]interface{}
 }

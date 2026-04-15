@@ -68,18 +68,6 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 
 	dataDir := TempDir
 
-	var bjPrefixes = []string{"bj43", "bj83", "bj87"}
-
-	var stocksPrefixes = append(
-		append([]string{}, MarketPrefixes...),
-		bjPrefixes...,
-	)
-
-	var allPrefixes = append(
-		append([]string{}, ValidPrefixes...),
-		bjPrefixes...,
-	)
-
 	switch opts.InputType {
 
 	case DayFileDir:
@@ -87,7 +75,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
 
 		fmt.Println("🐢 开始转换日线数据")
-		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, allPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}
@@ -99,7 +87,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
 
 		fmt.Println("🐢 开始转换 1 分钟数据")
-		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, stocksPrefixes, output, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
 		}
@@ -111,7 +99,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
 
 		fmt.Println("🐢 开始转换 5 分钟数据")
-		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, stocksPrefixes, output, ".5")
+		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
 		}
@@ -151,7 +139,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
 		fmt.Printf("🐢 开始转换 1 分钟数据\n")
-		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, stocksPrefixes, min1_output, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, min1_output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
@@ -164,7 +152,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		}
 
 		fmt.Printf("🐢 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertFilesToCSV(ctx, VipdocDir, stocksPrefixes, min5_output, ".5")
+		_, err = tdx.ConvertFilesToCSV(ctx, VipdocDir, min5_output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
 		}
@@ -201,7 +189,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 
 		output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_day.csv", baseName))
 
-		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, allPrefixes, output, ".day")
+		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
 		}

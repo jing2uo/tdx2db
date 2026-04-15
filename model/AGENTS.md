@@ -5,9 +5,10 @@
 ## STRUCTURE
 ```
 ./model/
-├── schema.go   # Data structs (StockData, StockBasic, Factor, GbbqData, etc.)
-├── tables.go   # Table metadata registry (SchemaFromStruct)
-└── views.go    # View ID registry (DefineView)
+├── classify.go  # Symbol classification (ClassifyCode → stock/index/etf/block/unknown)
+├── schema.go    # Data structs (KlineDay, KlineMin, StockBasic, Factor, GbbqData, Meta, etc.)
+├── tables.go    # Table metadata registry (SchemaFromStruct)
+└── views.go     # View ID registry (DefineView)
 ```
 
 ## WHERE TO LOOK
@@ -22,11 +23,13 @@
 
 | Struct | Table | Description |
 |--------|-------|-------------|
-| StockData | raw_stocks_daily | Raw OHLCV + date |
-| StockMinData | raw_stocks_1min / raw_stocks_5min | Minute OHLCV + datetime |
+| KlineDay | raw_kline_daily | Raw OHLCV + date |
+| KlineMin | raw_kline_1min / raw_kline_5min | Minute OHLCV + datetime |
+| SymbolClass | raw_symbol_class | Symbol → class mapping (stock/index/etf/block/unknown) |
 | StockBasic | raw_stocks_basic | Calculated: preclose, change_pct, amplitude, turnover, floatmv, totalmv |
 | Factor | raw_adjust_factor | HFQ factor per symbol per date |
 | GbbqData | raw_gbbq | 股本变迁: category + C1-C4 |
+| Meta | _meta | Key-value metadata (schema version, etc.) |
 | Holiday | raw_holidays | Holiday dates |
 | BlockInfo | raw_tdx_blocks_info | Block metadata |
 | BlockMember | raw_tdx_blocks_member | Stock-block membership |

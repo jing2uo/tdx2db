@@ -91,7 +91,7 @@ func init() {
 
 func executeUpdateDaily(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
 
-	latestDate, err := db.GetLatestDate(model.TableStocksDaily.TableName, "date")
+	latestDate, err := db.GetLatestDate(model.TableKlineDaily.TableName, "date")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest date from database: %w", err)
 	}
@@ -124,7 +124,7 @@ func executeDailyImport(ctx context.Context, db database.DataRepository, args *T
 
 	stockDailyCSV := filepath.Join(args.TempDir, "stock.csv")
 
-	_, err := tdx.ConvertFilesToCSV(ctx, sourceDir, args.ValidPrefixes, stockDailyCSV, ".day")
+	_, err := tdx.ConvertFilesToCSV(ctx, sourceDir, stockDailyCSV, ".day")
 	if err != nil {
 		return nil, fmt.Errorf("failed to convert day files to csv: %w", err)
 	}
@@ -135,8 +135,12 @@ func executeDailyImport(ctx context.Context, db database.DataRepository, args *T
 	default:
 	}
 
-	if err := db.ImportDailyStocks(stockDailyCSV); err != nil {
+	if err := db.ImportKlineDaily(stockDailyCSV); err != nil {
 		return nil, fmt.Errorf("failed to import stock csv: %w", err)
+	}
+
+	if err := db.RebuildSymbolClass(); err != nil {
+		return nil, fmt.Errorf("failed to rebuild symbol_class: %w", err)
 	}
 
 	fmt.Println("🚀 股票数据导入成功")
@@ -238,12 +242,12 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 
 		stock1MinCSV := filepath.Join(args.TempDir, "1min.csv")
 
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, args.ValidPrefixes, stock1MinCSV, ".01")
+		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock1MinCSV, ".01")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert .01 files to csv: %w", err)
 		}
 
-		if err := db.Import1MinStocks(stock1MinCSV); err != nil {
+		if err := db.ImportKline1Min(stock1MinCSV); err != nil {
 			return nil, fmt.Errorf("failed to import 1-minute line csv: %w", err)
 		}
 		fmt.Println("📊 1分钟数据导入成功")
@@ -274,12 +278,12 @@ func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *Ta
 
 		stock5MinCSV := filepath.Join(args.TempDir, "5min.csv")
 
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, args.ValidPrefixes, stock5MinCSV, ".5")
+		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock5MinCSV, ".5")
 		if err != nil {
 			return nil, fmt.Errorf("failed to convert .5 files to csv: %w", err)
 		}
 
-		if err := db.Import5MinStocks(stock5MinCSV); err != nil {
+		if err := db.ImportKline5Min(stock5MinCSV); err != nil {
 			return nil, fmt.Errorf("failed to import 5-minute line csv: %w", err)
 		}
 		fmt.Println("📊 5分钟数据导入成功")
@@ -318,9 +322,9 @@ func executeUpdateBlocks(ctx context.Context, db database.DataRepository, args *
 func getMinLineLatestDate(db database.DataRepository, minline string, args *TaskArgs) (time.Time, error) {
 	var tableName string
 	if minline == "1" {
-		tableName = model.TableStocks1Min.TableName
+		tableName = model.TableKline1Min.TableName
 	} else {
-		tableName = model.TableStocks5Min.TableName
+		tableName = model.TableKline5Min.TableName
 	}
 
 	latestDate, err := db.GetLatestDate(tableName, "datetime")

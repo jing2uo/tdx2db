@@ -5,10 +5,11 @@
 ## STRUCTURE
 ```
 ./cmd/
-├── common.go     # Shared constants (prefixes, paths, GetToday)
-├── init.go       # Full import (calls workflow with init tasks)
-├── cron.go       # Incremental update (calls workflow with update tasks)
-└── convert.go    # TDX to CSV conversion (standalone, no DB)
+├── common.go          # Shared constants (paths, GetToday)
+├── schema_version.go  # Schema version check logic (writeSchemaVersion/checkSchemaVersion)
+├── init.go            # Full import (calls workflow with init tasks)
+├── cron.go            # Incremental update (calls workflow with update tasks)
+└── convert.go         # TDX to CSV conversion (standalone, no DB)
 ```
 
 ## WHERE TO LOOK
@@ -16,7 +17,8 @@
 |------|------|-------|
 | Add new command | main.go + cmd/*.go | Cobra subcommand with ctx |
 | Modify flags | main.go | Add flags to command |
-| Change prefixes | common.go | Market/Index/Block prefixes |
+| Change symbol collection | model/classify.go | ClassifyCode + RebuildSymbolClass |
+| Schema version check | schema_version.go | writeSchemaVersion / checkSchemaVersion |
 | Modify cron logic | workflow/tasks.go | Task executor functions |
 | Run specific tasks | workflow/task.go | Use TaskExecutor directly |
 
@@ -33,22 +35,24 @@
 - CSV paths constructed in `workflow/tasks.go` using `filepath.Join(TempDir, "stock.csv")`
 - Cleaned up by `cobra.OnFinalize`
 
-**Common prefixes (common.go):**
-- Market: `sz30`, `sz00`, `sh60`, `sh68`, `bj920`
-- Index: `sh000300`, `sh000905`, `sz399001`, etc.
-- Block: `sh880` (concept/style), `sh881` (industry)
-- `ValidPrefixes` = all concatenated
+**Common (common.go):**
+- `GetToday()` - Current date
+- `TempDir` / `VipdocDir` - Temp directory paths
+
+**Schema version (schema_version.go):**
+- `writeSchemaVersion(db)` - Used by init: auto-write on fresh DB, reject if major mismatch
+- `checkSchemaVersion(db)` - Used by cron: reject if version missing or major mismatch
+- DB layer (`ReadSchemaVersion`/`WriteSchemaVersion`) only does read/write, no judgment
 
 **init command flow:**
 1. Create DB driver via `database.NewDB()`
-2. `Connect()` → `InitSchema()`
-3. `CheckDirectory(dayFileDir)`
-4. `tdx.ConvertFilesToCSV()` → TempDir/stock.csv
-5. `db.ImportDailyStocks()`
+2. `Connect()` → `InitSchema()` → `writeSchemaVersion()`
+3. Check `CountKlineDaily()` — skip if data already exists
+4. Run workflow tasks for init
 
 **cron command flow (cmd/cron.go):**
 1. Create DB + Connect + InitSchema
-2. Build TaskExecutor with all registered tasks
+2. `checkSchemaVersion()` — reject if version missing or incompatible
 3. Run `GetUpdateTaskNames()` → DAG execution:
    - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
    - Optional: `update_1min`, `update_5min`, `update_blocks` (via --minline, --tdxhome)
