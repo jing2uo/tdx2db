@@ -53,7 +53,6 @@ type Task struct {
 
 type TaskArgs struct {
 	Minline       string
-	TdxHome       string
 	TempDir       string
 	VipdocDir     string
 	DayFileDir    string

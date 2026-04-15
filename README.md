@@ -132,15 +132,6 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 3. 分时更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
-### 拓展数据
-
-cron 命令支持导入通达信概念、风格、行业成分，也处理假期。
-
-```bash
-# tdxhome 表示通达信安装目录，可以和 --minline 共用
-tdx2db cron --dburi 'duckdb://tdx.db' --tdxhome ~/new_tdx
-```
-
 ### 表查询
 
 raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。

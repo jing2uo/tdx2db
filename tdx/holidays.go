@@ -12,26 +12,28 @@ import (
 	"github.com/jing2uo/tdx2db/utils"
 )
 
-// ExportTdxHolidaysToCSV 从通达信安装目录导出交易日历到 CSV。
-func ExportTdxHolidaysToCSV(tdxHome, outputDir string) (string, error) {
-	tdxHome = expandPath(tdxHome)
-	outputDir = expandPath(outputDir)
-
+// ExportTdxHolidaysToCSV 解压 zhb.zip 并从 needini.dat 中导出交易日历。
+// zhbZipPath 指向通达信 gbbq.zip 中嵌套的 zhb.zip；
+// outputDir 用作 CSV 输出目录，同时在其下创建 zhb/ 存放解压结果。
+func ExportTdxHolidaysToCSV(zhbZipPath, outputDir string) (string, error) {
+	if err := utils.CheckFile(zhbZipPath); err != nil {
+		return "", fmt.Errorf("zhb.zip 检查失败: %w", err)
+	}
 	if err := utils.CheckOutputDir(outputDir); err != nil {
 		return "", fmt.Errorf("输出目录检查失败: %w", err)
 	}
 
-	hqCache := filepath.Join(tdxHome, "T0002/hq_cache")
-	if err := utils.CheckDirectory(hqCache); err != nil {
-		return "", fmt.Errorf("通达信安装目录检查失败: %w", err)
+	unzipDir := filepath.Join(outputDir, "zhb")
+	if err := utils.UnzipFile(zhbZipPath, unzipDir); err != nil {
+		return "", fmt.Errorf("解压 zhb.zip 失败: %w", err)
 	}
 
-	inputFile := filepath.Join(hqCache, "needini.dat")
-	if err := utils.CheckFile(inputFile); err != nil {
-		return "", fmt.Errorf("假期日历文件检查失败: %w", err)
+	needini := filepath.Join(unzipDir, "needini.dat")
+	if err := utils.CheckFile(needini); err != nil {
+		return "", fmt.Errorf("needini.dat 检查失败: %w", err)
 	}
 
-	holidays, err := ReadHolidays(inputFile)
+	holidays, err := ReadHolidays(needini)
 	if err != nil {
 		return "", err
 	}
@@ -49,7 +51,7 @@ func ExportTdxHolidaysToCSV(tdxHome, outputDir string) (string, error) {
 	return outputFile, nil
 }
 
-// ReadHolidays 读取假日数据文件
+// ReadHolidays 读取 needini.dat 并解析为 Holiday 列表。
 func ReadHolidays(filePath string) ([]model.Holiday, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
@@ -70,8 +72,7 @@ func ReadHolidays(filePath string) ([]model.Holiday, error) {
 			continue
 		}
 
-		datePart := parts[1]
-		items := strings.Split(datePart, ",")
+		items := strings.Split(parts[1], ",")
 
 		var cleanItems []string
 		for _, item := range items {
@@ -86,13 +87,9 @@ func ReadHolidays(filePath string) ([]model.Holiday, error) {
 		}
 
 		year := cleanItems[0]
-		dates := cleanItems[1:]
-
-		for _, dateMMDD := range dates {
+		for _, dateMMDD := range cleanItems[1:] {
 			if len(dateMMDD) == 4 {
-				month := dateMMDD[:2]
-				day := dateMMDD[2:]
-				fullDate := fmt.Sprintf("%s-%s-%s", year, month, day)
+				fullDate := fmt.Sprintf("%s-%s-%s", year, dateMMDD[:2], dateMMDD[2:])
 				allHolidays = append(allHolidays, fullDate)
 			}
 		}
@@ -111,16 +108,4 @@ func ReadHolidays(filePath string) ([]model.Holiday, error) {
 	}
 
 	return holidays, nil
-}
-
-// expandPath 展开路径中的 ~ 符号
-func expandPath(path string) string {
-	if strings.HasPrefix(path, "~/") {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return path
-		}
-		return filepath.Join(home, path[2:])
-	}
-	return path
 }

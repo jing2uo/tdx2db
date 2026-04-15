@@ -55,7 +55,8 @@
 2. `checkSchemaVersion()` — reject if version missing or incompatible
 3. Run `GetUpdateTaskNames()` → DAG execution:
    - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
-   - Optional: `update_1min`, `update_5min`, `update_holidays` (via --minline, --tdxhome)
+   - Optional: `update_1min`, `update_5min` (via --minline)
+   - `update_holidays` 依赖 `update_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
 4. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**

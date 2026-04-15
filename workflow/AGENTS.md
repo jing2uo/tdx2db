@@ -56,7 +56,6 @@ TaskUpdate1Min = &Task{
 
 **TaskArgs:**
 - `Minline` - "1", "5", "1,5"
-- `TdxHome` - 通达信安装目录
 - `TempDir`, `VipdocDir` - Temp directories
 - `DayFileDir` - User-provided TDX data directory (for init)
 - `Today` - Current date for incremental updates
@@ -86,7 +85,7 @@ TaskUpdate1Min = &Task{
 - `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_5min, update_holidays)
 
 **Task skipping:**
-- Tasks can be skipped by `SkipIf` condition (e.g., minline not set, tdxhome empty)
+- Tasks can be skipped by `SkipIf` condition (e.g., minline not set)
 - Tasks can also return `StateSkipped` when no new data exists (e.g., non-trading day, data already up to date)
 
 **Usage from cmd/init.go:**
@@ -106,7 +105,6 @@ executor.Run(ctx, workflow.GetInitTaskNames(), args)
 executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 args := &workflow.TaskArgs{
     Minline:   minline,
-    TdxHome:   tdxhome,
     TempDir:   TempDir,
     VipdocDir: VipdocDir,
     Today:     GetToday(),

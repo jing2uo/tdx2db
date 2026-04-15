@@ -80,12 +80,9 @@ func init() {
 
 	TaskUpdateHolidays = &Task{
 		Name:      "update_holidays",
-		DependsOn: []string{},
-		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
-			return args.TdxHome == ""
-		},
-		Executor: executeUpdateHolidays,
-		OnError:  ErrorModeSkip,
+		DependsOn: []string{"update_gbbq"},
+		Executor:  executeUpdateHolidays,
+		OnError:   ErrorModeSkip,
 	}
 }
 
@@ -296,7 +293,8 @@ func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *Ta
 
 func executeUpdateHolidays(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
 	fmt.Printf("🐢 导入通达信交易日历\n")
-	holidaysFile, err := tdx.ExportTdxHolidaysToCSV(args.TdxHome, args.TempDir)
+	zhbZipPath := filepath.Join(args.TempDir, "gbbq-temp", "zhb.zip")
+	holidaysFile, err := tdx.ExportTdxHolidaysToCSV(zhbZipPath, args.TempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "🚨 警告: %v\n", err)
 		return &TaskResult{State: StateFailed, Error: err, Message: "holidays import warning"}, nil
@@ -438,7 +436,7 @@ func getGbbqFile(cacheDir string) (string, error) {
 	}
 
 	unzipPath := filepath.Join(cacheDir, "gbbq-temp")
-	if err := utils.UnzipFile(zipPath, unzipPath); err != nil {
+	if err := utils.UnzipFile(zipPath, unzipPath, true); err != nil {
 		return "", fmt.Errorf("failed to unzip GBBQ file: %w", err)
 	}
 
