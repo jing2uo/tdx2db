@@ -35,7 +35,7 @@
 - `Connect()/Close()` - Lifecycle management
 - `InitSchema()` - Create tables + views (auto-registered via model package)
 - `ReadSchemaVersion()/WriteSchemaVersion()` - _meta table schema version read/write (no judgment logic)
-- `Import*()` - CSV import: KlineDaily, Kline1Min, Kline5Min, AdjustFactors, GBBQ, Basic, Holidays, BlocksInfo, BlocksMember
+- `Import*()` - CSV import: KlineDaily, Kline1Min, Kline5Min, AdjustFactors, GBBQ, Basic, Holidays
 - `TruncateTable(meta)` - Clear table (used by full-recalc tasks)
 - `Query()` - Generic query with conditions map
 - `QueryKlineDaily()` - Date range filtered OHLCV data

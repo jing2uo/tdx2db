@@ -76,14 +76,14 @@ TaskUpdate1Min = &Task{
 ## NOTES
 
 **Task chains:**
-- Update mode: `update_daily → update_gbbq → calc_basic → calc_factor → update_1min → update_5min → update_blocks`
+- Update mode: `update_daily → update_gbbq → calc_basic → calc_factor → update_1min → update_5min → update_holidays`
 - Init mode: `init_daily` (only import daily data from user-provided directory)
 
 **calc_basic and calc_factor run in full recalculation mode** — they truncate the target table and reimport all rows. This is intentional because preclose/factor depend on the entire history chain.
 
 **Error modes:**
 - `ErrorModeStop` - Stop execution on error (default)
-- `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_5min, update_blocks)
+- `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_5min, update_holidays)
 
 **Task skipping:**
 - Tasks can be skipped by `SkipIf` condition (e.g., minline not set, tdxhome empty)

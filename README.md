@@ -156,8 +156,6 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 | `raw_kline_daily`       | 日线数据 (股票/指数/ETF/板块) |
 | `raw_stocks_basic`      | 股票前收盘价、换手率与市值    |
 | `raw_symbol_class`      | 品种分类 (stock/index/etf/等) |
-| `raw_tdx_blocks_info`   | 概念、风格、行业板块信息      |
-| `raw_tdx_blocks_member` | 板块成分                      |
 | `v_bfq_daily`           | 不复权日线，包含 stocks_basic |
 | `v_qfq_daily`           | 前复权日线数据                |
 | `v_hfq_daily`           | 后复权日线数据                |

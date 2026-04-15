@@ -55,7 +55,7 @@
 2. `checkSchemaVersion()` — reject if version missing or incompatible
 3. Run `GetUpdateTaskNames()` → DAG execution:
    - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
-   - Optional: `update_1min`, `update_5min`, `update_blocks` (via --minline, --tdxhome)
+   - Optional: `update_1min`, `update_5min`, `update_holidays` (via --minline, --tdxhome)
 4. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**

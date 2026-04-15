@@ -70,21 +70,7 @@ type Holiday struct {
 	Date time.Time `col:"date" type:"date"`
 }
 
-type BlockMember struct {
-	StockSymbol string `col:"stock_symbol"`
-	BlockCode   string `col:"block_code"`
-}
-
 type Meta struct {
 	Key   string `col:"key"`
 	Value string `col:"value"`
-}
-
-type BlockInfo struct {
-	BlockType   string `col:"block_type"`
-	BlockName   string `col:"block_name"`
-	BlockSymbol string `col:"block_symbol"`
-	BlockCode   string `col:"block_code"`
-	ParentCode  string `col:"parent_code"`
-	BlockLevel  int    `col:"block_level"`
 }
