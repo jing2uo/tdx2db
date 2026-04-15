@@ -22,6 +22,10 @@ func Cron(ctx context.Context, dbURI, minline, tdxhome string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	if err := checkSchemaVersion(db); err != nil {
+		return err
+	}
+
 	defer db.Close()
 
 	if err := ctx.Err(); err != nil {

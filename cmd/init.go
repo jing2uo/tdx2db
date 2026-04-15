@@ -24,6 +24,10 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
+	if err := writeSchemaVersion(db); err != nil {
+		return err
+	}
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}

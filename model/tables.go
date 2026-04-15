@@ -107,7 +107,11 @@ func SchemaFromStruct(tableName string, model interface{}, orderByKey []string) 
 	return meta
 }
 
-// --- 表结构元数据 (TableMeta) ---
+var MetaTable = SchemaFromStruct(
+	"_meta",
+	Meta{},
+	[]string{"key"},
+)
 
 var TableKlineDaily = SchemaFromStruct(
 	"raw_kline_daily",

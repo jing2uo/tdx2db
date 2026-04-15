@@ -12,6 +12,9 @@ type DataRepository interface {
 
 	InitSchema() error
 
+	ReadSchemaVersion() (string, error)
+	WriteSchemaVersion() error
+
 	ImportKlineDaily(csvPath string) error
 	ImportKline1Min(csvPath string) error
 	ImportKline5Min(csvPath string) error
