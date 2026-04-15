@@ -132,15 +132,6 @@ tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
 3. 分时更新间隔超过 30 天以上，需手动补齐数据后才能继续处理
 4. 股票代码变更不会处理历史记录
 
-### 拓展数据
-
-cron 命令支持导入通达信概念、风格、行业成分，也处理假期。
-
-```bash
-# tdxhome 表示通达信安装目录，可以和 --minline 共用
-tdx2db cron --dburi 'duckdb://tdx.db' --tdxhome ~/new_tdx
-```
-
 ### 表查询
 
 raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
@@ -156,8 +147,6 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 | `raw_kline_daily`       | 日线数据 (股票/指数/ETF/板块) |
 | `raw_stocks_basic`      | 股票前收盘价、换手率与市值    |
 | `raw_symbol_class`      | 品种分类 (stock/index/etf/等) |
-| `raw_tdx_blocks_info`   | 概念、风格、行业板块信息      |
-| `raw_tdx_blocks_member` | 板块成分                      |
 | `v_bfq_daily`           | 不复权日线，包含 stocks_basic |
 | `v_qfq_daily`           | 前复权日线数据                |
 | `v_hfq_daily`           | 后复权日线数据                |

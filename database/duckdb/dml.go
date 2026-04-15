@@ -74,15 +74,6 @@ func (d *DuckDBDriver) ImportHolidays(path string) error {
 	return d.importCSV(model.TableHoliday, path)
 }
 
-func (d *DuckDBDriver) ImportBlocksInfo(path string) error {
-	d.TruncateTable(model.TableBlockInfo)
-	return d.importCSV(model.TableBlockInfo, path)
-}
-
-func (d *DuckDBDriver) ImportBlocksMember(path string) error {
-	return d.importCSV(model.TableBlockMember, path)
-}
-
 func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 	args := []interface{}{}

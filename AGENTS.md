@@ -152,7 +152,7 @@ Input: `[]StockBasic` + `[]GbbqData` → Output: `[]Factor`
 - `TaskExecutor` manages task execution with dependency resolution (DAG topological sort)
 - Tasks defined in `workflow/tasks.go` with explicit `DependsOn` arrays
 - Parallel execution of tasks with no dependencies
-- Optional tasks via `SkipIf` condition (e.g., `--minline`, `--tdxhome`)
+- Optional tasks via `SkipIf` condition (e.g., `--minline`)
 - Error modes: `ErrorModeStop` (default) vs `ErrorModeSkip`
 
 **Incremental update logic:**

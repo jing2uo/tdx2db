@@ -1,13 +1,13 @@
 # TDX DATA PARSING
 
-**Purpose:** Parse 通达信(TDX) binary format files (.day, .1, .05, blocks)
+**Purpose:** Parse 通达信(TDX) binary format files (.day, .1, .05) 与假期日历
 
 ## STRUCTURE
 ```
 ./tdx/
 ├── kline.go       # K-line parsing (.day, .1, .05)
 ├── gbbq.go        # 股本变迁 parsing
-├── blocks.go      # Block/concept parsing
+├── holidays.go    # 交易日历解析
 ├── gbbq_var.go    # TDX datatool variable definitions
 ├── datatool.go    # Embedded datatool interface
 └── embed/         # Embedded TDX datatool binary
@@ -17,7 +17,7 @@
 | Task | File | Notes |
 |------|------|-------|
 | Add new K-line format | kline.go | Follow 32-byte record pattern |
-| Parse block data | blocks.go | Binary format from TDX |
+| Parse holidays | holidays.go | needini.dat 文本解析 |
 | Modify gbbq parsing | gbbq.go | Uses embedded datatool |
 | TDX binary format | All files | Little-endian byte order |
 

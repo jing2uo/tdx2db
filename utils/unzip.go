@@ -8,7 +8,11 @@ import (
 	"strings"
 )
 
-func UnzipFile(zipPath, targetPath string) error {
+// UnzipFile 解压 zip。默认跳过内嵌的 .zip 文件（用于 day4/tic4 等包含嵌套归档的场景）。
+// 传 includeNestedZip=true 时会一并解压嵌套的 .zip 文件。
+func UnzipFile(zipPath, targetPath string, includeNestedZip ...bool) error {
+	includeZip := len(includeNestedZip) > 0 && includeNestedZip[0]
+
 	r, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return err
@@ -16,8 +20,7 @@ func UnzipFile(zipPath, targetPath string) error {
 	defer r.Close()
 
 	for _, f := range r.File {
-		// 跳过 .zip 文件
-		if strings.HasSuffix(strings.ToLower(f.Name), ".zip") {
+		if !includeZip && strings.HasSuffix(strings.ToLower(f.Name), ".zip") {
 			continue
 		}
 

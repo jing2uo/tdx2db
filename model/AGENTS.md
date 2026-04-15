@@ -31,8 +31,6 @@
 | GbbqData | raw_gbbq | 股本变迁: category + C1-C4 |
 | Meta | _meta | Key-value metadata (schema version, etc.) |
 | Holiday | raw_holidays | Holiday dates |
-| BlockInfo | raw_tdx_blocks_info | Block metadata |
-| BlockMember | raw_tdx_blocks_member | Stock-block membership |
 
 ## CONVENTIONS
 

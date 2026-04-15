@@ -104,15 +104,6 @@ func (d *ClickHouseDriver) ImportHolidays(path string) error {
 	return d.importCSV(model.TableHoliday, path)
 }
 
-func (d *ClickHouseDriver) ImportBlocksInfo(path string) error {
-	d.TruncateTable(model.TableBlockInfo)
-	return d.importCSV(model.TableBlockInfo, path)
-}
-
-func (d *ClickHouseDriver) ImportBlocksMember(path string) error {
-	return d.importCSV(model.TableBlockMember, path)
-}
-
 func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {
 	query := fmt.Sprintf("SELECT * FROM %s", table)
 	args := []interface{}{}

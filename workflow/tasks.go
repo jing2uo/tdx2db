@@ -22,7 +22,7 @@ var (
 	TaskCalcFactor   *Task
 	TaskUpdate1Min   *Task
 	TaskUpdate5Min   *Task
-	TaskUpdateBlocks *Task
+	TaskUpdateHolidays *Task
 )
 
 func init() {
@@ -78,14 +78,11 @@ func init() {
 		OnError:  ErrorModeSkip,
 	}
 
-	TaskUpdateBlocks = &Task{
-		Name:      "update_blocks",
-		DependsOn: []string{},
-		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
-			return args.TdxHome == ""
-		},
-		Executor: executeUpdateBlocks,
-		OnError:  ErrorModeSkip,
+	TaskUpdateHolidays = &Task{
+		Name:      "update_holidays",
+		DependsOn: []string{"update_gbbq"},
+		Executor:  executeUpdateHolidays,
+		OnError:   ErrorModeSkip,
 	}
 }
 
@@ -294,29 +291,20 @@ func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *Ta
 	return &TaskResult{State: StateSkipped, Message: "no new 5min data"}, nil
 }
 
-func executeUpdateBlocks(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	fmt.Printf("🐢 导入通达信概念行业等信息\n")
-	result, err := tdx.ExportTdxBlocksDataToCSV(args.TdxHome, args.TempDir)
+func executeUpdateHolidays(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
+	fmt.Printf("🐢 导入通达信交易日历\n")
+	zhbZipPath := filepath.Join(args.TempDir, "gbbq-temp", "zhb.zip")
+	holidaysFile, err := tdx.ExportTdxHolidaysToCSV(zhbZipPath, args.TempDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "🚨 警告: %v\n", err)
-		return &TaskResult{State: StateFailed, Error: err, Message: "blocks import warning"}, nil
+		return &TaskResult{State: StateFailed, Error: err, Message: "holidays import warning"}, nil
 	}
 
-	if result.HolidaysFile != "" {
-		db.ImportHolidays(result.HolidaysFile)
-	}
-	if result.BlockInfoFile != "" {
-		db.ImportBlocksInfo(result.BlockInfoFile)
-	}
-	if result.BlockMembersConceptFile != "" {
-		db.TruncateTable(model.TableBlockMember)
-		db.ImportBlocksMember(result.BlockMembersConceptFile)
-	}
-	if result.BlockMembersIndustryFile != "" {
-		db.ImportBlocksMember(result.BlockMembersIndustryFile)
+	if err := db.ImportHolidays(holidaysFile); err != nil {
+		return nil, fmt.Errorf("failed to import holidays: %w", err)
 	}
 
-	return &TaskResult{State: StateCompleted, Message: "blocks data imported"}, nil
+	return &TaskResult{State: StateCompleted, Message: "holidays data imported"}, nil
 }
 
 func getMinLineLatestDate(db database.DataRepository, minline string, args *TaskArgs) (time.Time, error) {
@@ -448,7 +436,7 @@ func getGbbqFile(cacheDir string) (string, error) {
 	}
 
 	unzipPath := filepath.Join(cacheDir, "gbbq-temp")
-	if err := utils.UnzipFile(zipPath, unzipPath); err != nil {
+	if err := utils.UnzipFile(zipPath, unzipPath, true); err != nil {
 		return "", fmt.Errorf("failed to unzip GBBQ file: %w", err)
 	}
 
@@ -463,20 +451,20 @@ func GetUpdateTaskNames() []string {
 		"calc_factor",
 		"update_1min",
 		"update_5min",
-		"update_blocks",
+		"update_holidays",
 	}
 }
 
 func GetRegisteredTasks() map[string]*Task {
 	return map[string]*Task{
-		"update_daily":  TaskUpdateDaily,
-		"init_daily":    TaskInitDaily,
-		"update_gbbq":   TaskUpdateGBBQ,
-		"calc_basic":    TaskCalcBasic,
-		"calc_factor":   TaskCalcFactor,
-		"update_1min":   TaskUpdate1Min,
-		"update_5min":   TaskUpdate5Min,
-		"update_blocks": TaskUpdateBlocks,
+		"update_daily":    TaskUpdateDaily,
+		"init_daily":      TaskInitDaily,
+		"update_gbbq":     TaskUpdateGBBQ,
+		"calc_basic":      TaskCalcBasic,
+		"calc_factor":     TaskCalcFactor,
+		"update_1min":     TaskUpdate1Min,
+		"update_5min":     TaskUpdate5Min,
+		"update_holidays": TaskUpdateHolidays,
 	}
 }
 

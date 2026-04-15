@@ -20,7 +20,7 @@ var classRules = []struct {
 	// 沪市股票
 	{"sh", "600", ClassStock}, {"sh", "601", ClassStock},
 	{"sh", "603", ClassStock}, {"sh", "605", ClassStock},
-	{"sh", "688", ClassStock},
+	{"sh", "688", ClassStock}, {"sh", "689", ClassStock},
 	// 沪市指数
 	{"sh", "000", ClassIndex},
 	// 通达信板块指数
@@ -34,6 +34,7 @@ var classRules = []struct {
 	{"sz", "000", ClassStock}, {"sz", "001", ClassStock},
 	{"sz", "002", ClassStock}, {"sz", "003", ClassStock},
 	{"sz", "300", ClassStock}, {"sz", "301", ClassStock},
+	{"sz", "302", ClassStock},
 	// 深市指数
 	{"sz", "399", ClassIndex},
 	// 深市 ETF (15) / LOF (16)
