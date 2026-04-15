@@ -72,7 +72,7 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *ClickHouseDriver) registerViews() {
-	// 不复权视图 (BFQ)
+	// 不复权视图 (BFQ) — 仅 stock
 	d.viewImpls[model.ViewDailyBFQ] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
@@ -99,6 +99,7 @@ func (d *ClickHouseDriver) registerViews() {
 				COALESCE(f.hfq_factor, 1) AS hfq_factor,
 				COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 			FROM %s s
+			INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = 'stock'
 			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 			LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
@@ -106,6 +107,7 @@ func (d *ClickHouseDriver) registerViews() {
 			model.ViewDailyBFQ,
 			model.TableAdjustFactor.TableName,
 			model.TableKlineDaily.TableName,
+			model.TableSymbolClass.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
@@ -113,7 +115,7 @@ func (d *ClickHouseDriver) registerViews() {
 		return err
 	}
 
-	// 后复权视图 (HFQ) - factor 表已和日线对齐，直接 JOIN
+	// 后复权视图 (HFQ) — 仅 stock
 	d.viewImpls[model.ViewDailyHFQ] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
@@ -134,11 +136,13 @@ func (d *ClickHouseDriver) registerViews() {
 				b.amplitude  AS amplitude,
 				COALESCE(f.hfq_factor, 1) AS hfq_factor
 			FROM %s s
+			INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = 'stock'
 			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 		`,
 			model.ViewDailyHFQ,
 			model.TableKlineDaily.TableName,
+			model.TableSymbolClass.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
@@ -146,7 +150,7 @@ func (d *ClickHouseDriver) registerViews() {
 		return err
 	}
 
-	// 前复权视图 (QFQ) - qfq_factor = hfq_factor / latest_hfq_factor
+	// 前复权视图 (QFQ) — 仅 stock
 	d.viewImpls[model.ViewDailyQFQ] = func() error {
 		query := fmt.Sprintf(`
 			CREATE OR REPLACE VIEW %s AS
@@ -172,6 +176,7 @@ func (d *ClickHouseDriver) registerViews() {
 				b.amplitude  AS amplitude,
 				COALESCE(f.hfq_factor, 1) / COALESCE(lf.latest_hfq, 1) AS qfq_factor
 			FROM %s s
+			INNER JOIN %s sc ON s.symbol = sc.symbol AND sc.class = 'stock'
 			LEFT JOIN %s f ON s.symbol = f.symbol AND s.date = f.date
 			LEFT JOIN latest_factors lf ON s.symbol = lf.symbol
 			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
@@ -179,6 +184,7 @@ func (d *ClickHouseDriver) registerViews() {
 			model.ViewDailyQFQ,
 			model.TableAdjustFactor.TableName,
 			model.TableKlineDaily.TableName,
+			model.TableSymbolClass.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
