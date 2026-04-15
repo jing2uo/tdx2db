@@ -1,10 +1,12 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-04-09
-**Branch:** fix/calc_basic_fq
+**Updated:** 2026-04-15
+**Branch:** feat/symbol-class
 
 ## OVERVIEW
 通达信(TDX) stock data importer — loads .day/.1/.05 files to DuckDB/ClickHouse, calculates preclose/turnover/market-value (basic), and 后复权因子 (hfq_factor).
+
+Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_meta` table stores the schema version; init/cron check major version compatibility at startup.
 
 ## STRUCTURE
 ```
@@ -49,7 +51,7 @@
 | CalculateStockBasic | func | calc/basic.go:111 | Core basic calculation (preclose/turnover/MV) |
 | calculateFullHfq | func | calc/fq_quantaxis.go:97 | Core HFQ factor calculation |
 | buildXdxrDateSet | func | calc/fq_quantaxis.go:130 | Map gbbq dates → trading days for HFQ |
-| StockData | type | model/schema.go:5 | Raw daily OHLCV |
+| StockData | type | model/schema.go:5 | Raw daily OHLCV (renamed to KlineDay in v3) |
 | StockBasic | type | model/schema.go:33 | Calculated basic (preclose/turnover/MV) |
 | Factor | type | model/schema.go:27 | Adjust factor (hfq_factor) |
 | GbbqData | type | model/schema.go:45 | 股本变迁 data (category 1=除权, 2/3/5/7/8/9/10=股本变动) |
@@ -62,18 +64,32 @@
 - DuckDB: `duckdb://[path]`
 
 **Table naming:**
-- `raw_*` — raw imported data (raw_stocks_daily, raw_stocks_basic, raw_adjust_factor, raw_gbbq, etc.)
+- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_kline_5min, raw_stocks_basic, raw_adjust_factor, raw_gbbq, raw_symbol_class, etc.)
 - `v_*` — views (v_bfq_daily, v_qfq_daily, v_hfq_daily)
+- `_meta` — schema version metadata (key/value store)
 
 **Table registration:**
 - All tables auto-registered via `SchemaFromStruct()` init-time calls in `model/tables.go`
 - Views registered via `DefineView()` in `model/views.go`
-- Use `model.Table*` constants for table references (never hardcode table names)
+- Use `model.Table*` / `model.MetaTable` constants for table references (never hardcode table names)
 
-**TDX file prefixes (cmd/common.go):**
-- Market: `sz30`, `sz00`, `sh60`, `sh68`, `bj920`
-- Index: `sh000300`, `sh000905`, `sz399001`, etc.
-- Block: `sh880` (concept/style), `sh881` (industry)
+**TDX file collection (cmd/common.go):**
+- All .day/.01/.5 files collected by suffix, filtered only by `^(sh|sz|bj)\d+$` regex
+- No prefix whitelist — full ingest of everything TDX provides
+- Symbol classification via `raw_symbol_class` table (rebuilt after each daily import)
+
+**Symbol classification (model/classify.go):**
+- `ClassifyCode(symbol) → stock/index/etf/block/unknown`
+- Rules match by (market, numeric prefix) — longest prefix wins
+- basic/factor calculation uses `GetSymbolsByClass("stock")` — no index/ETF in calc output
+- Class `unknown` includes: 可转债 (sh11xxxx, sz12xxxx, sz13xxxx), 封闭式基金 (sh50xxxx), 国债 (sh24xxxx), etc.
+
+**Schema versioning (cmd/schema_version.go):**
+- `model.SchemaMajor` / `model.SchemaMinor` define current version
+- DB stores version in `_meta` table via `ReadSchemaVersion()` / `WriteSchemaVersion()`
+- `init`: auto-writes version on fresh DB; rejects if existing major doesn't match
+- `cron`: rejects if version missing or major doesn't match
+- Breaking changes (table rename, field semantics) → increment `SchemaMajor`
 
 **GbbqData categories:**
 - Category 1: 除权除息 (dividends/bonus shares) — C1=分红, C2=配股, C3=送转股, C4=配股价
@@ -94,7 +110,7 @@
 ## CALCULATION LOGIC
 
 ### calc/basic.go — CalculateStockBasic
-Input: `[]StockData` (raw daily) + `[]GbbqData` → Output: `[]StockBasic`
+Input: `[]KlineDay` (raw daily) + `[]GbbqData` → Output: `[]StockBasic`
 
 1. **xdxr date mapping** (category=1): gbbq date → trading day via `sort.Search` (handles non-trading days)
 2. **Shares tracking** (category 2/3/5/7/8/9/10): maintains running float/total share counts
@@ -128,6 +144,7 @@ Input: `[]StockBasic` + `[]GbbqData` → Output: `[]Factor`
 - Commit `tdx/embed/datatool` to git — downloaded at build time
 - Import `_ "github.com/duckdb/duckdb-go/v2"` outside init package — register driver early
 - Break the date mapping consistency between basic.go and fq_quantaxis.go
+- Put version-check logic in the DB layer — DB only does Read/Write; judgment stays in cmd/
 
 ## UNIQUE STYLES
 
@@ -178,3 +195,4 @@ tdx2db init --dburi 'clickhouse://localhost' --dayfiledir /path/to/vipdoc/
 - 分时数据无历史 — need to backfill manually
 - Symbol code changes not handled (历史记录不更新)
 - Indices (sh000xxx, sz399xxx, sh880/881xxx) have no float shares → turnover/floatmv = 0, this is expected
+- `raw_symbol_class` is rebuilt from `raw_kline_daily` on each daily import — adding classification rules retroactively will auto-classify on next import

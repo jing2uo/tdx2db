@@ -34,12 +34,14 @@
 **DataRepository interface (interface.go):**
 - `Connect()/Close()` - Lifecycle management
 - `InitSchema()` - Create tables + views (auto-registered via model package)
-- `Import*()` - CSV import: DailyStocks, 1Min, 5Min, AdjustFactors, GBBQ, Basic, Holidays, BlocksInfo, BlocksMember
+- `ReadSchemaVersion()/WriteSchemaVersion()` - _meta table schema version read/write (no judgment logic)
+- `Import*()` - CSV import: KlineDaily, Kline1Min, Kline5Min, AdjustFactors, GBBQ, Basic, Holidays, BlocksInfo, BlocksMember
 - `TruncateTable(meta)` - Clear table (used by full-recalc tasks)
 - `Query()` - Generic query with conditions map
-- `QueryStockData()` - Date range filtered OHLCV data
+- `QueryKlineDaily()` - Date range filtered OHLCV data
 - `GetLatestDate()` - Used by cron for incremental updates
-- `GetAllSymbols()` - All distinct symbols
+- `GetSymbolsByClass()` - Symbols filtered by class (stock/index/etf/block/unknown)
+- `RebuildSymbolClass()` - Rebuild symbol_class table from raw_kline_daily
 - `GetBasicsBySymbol()` - StockBasic data for factor calculation
 - `GetGbbq()` - All gbbq records (loaded once, indexed in calc)
 
@@ -55,7 +57,7 @@
 **Query methods:**
 - `Query()` - Generic query with conditions map
 - `GetLatestDate()` - Used by cron for incremental updates
-- `QueryStockData()` - Date range filtered OHLCV data
+- `QueryKlineDaily()` - Date range filtered OHLCV data
 
 ## ANTI-PATTERNS
 
@@ -67,13 +69,14 @@
 **NEVER:**
 - Mix driver-specific code in interface - keep implementations separate
 - Add new import method without adding to interface
-- Hardcode table names - use `model.Table*` constants
+- Hardcode table names - use `model.Table*` / `model.MetaTable` constants
 
 ## NOTES
 
 **Table naming:**
-- `raw_*` - Imported data tables (raw_stocks_daily, raw_stocks_basic, raw_adjust_factor, raw_gbbq, etc.)
+- `raw_*` - Imported data tables (raw_kline_daily, raw_stocks_basic, raw_adjust_factor, raw_gbbq, raw_symbol_class, etc.)
 - `v_*` - Views (v_bfq_daily, v_qfq_daily, v_hfq_daily)
+- `_meta` - Schema version and metadata (key/value)
 - Tables auto-registered via `model.SchemaFromStruct()`, views via `model.DefineView()`
 - View implementations are driver-specific (registered in ddl.go via `registerViews()`)
 
