@@ -22,9 +22,9 @@ const (
 func ConvertFilesToCSV(ctx context.Context, inputDir string, validPrefixes []string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
-		return runConversion[model.StockData](ctx, inputDir, validPrefixes, outputFile, suffix, processDayFile)
+		return runConversion[model.KlineDay](ctx, inputDir, validPrefixes, outputFile, suffix, processDayFile)
 	case ".01", ".5":
-		return runConversion[model.StockMinData](ctx, inputDir, validPrefixes, outputFile, suffix, processMinFile)
+		return runConversion[model.KlineMin](ctx, inputDir, validPrefixes, outputFile, suffix, processMinFile)
 	default:
 		return "", fmt.Errorf("unsupported suffix: %s", suffix)
 	}
@@ -104,13 +104,13 @@ func readFileAndParse[T any](
 	return parser(data, symbol)
 }
 
-func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
+func processDayFile(data []byte, symbol string) ([]model.KlineDay, error) {
 	n := len(data)
 	if n%recordSize != 0 {
 		return nil, fmt.Errorf("invalid file size: %d", n)
 	}
 	count := n / recordSize
-	rows := make([]model.StockData, 0, count)
+	rows := make([]model.KlineDay, 0, count)
 
 	var offset int
 	for i := 0; i < count; i++ {
@@ -134,7 +134,7 @@ func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
 			continue
 		}
 
-		rows = append(rows, model.StockData{
+		rows = append(rows, model.KlineDay{
 			Symbol: symbol,
 			Open:   float64(openRaw) / 100.0,
 			High:   float64(highRaw) / 100.0,
@@ -148,13 +148,13 @@ func processDayFile(data []byte, symbol string) ([]model.StockData, error) {
 	return rows, nil
 }
 
-func processMinFile(data []byte, symbol string) ([]model.StockMinData, error) {
+func processMinFile(data []byte, symbol string) ([]model.KlineMin, error) {
 	n := len(data)
 	if n%recordSize != 0 {
 		return nil, fmt.Errorf("invalid file size: %d", n)
 	}
 	count := n / recordSize
-	rows := make([]model.StockMinData, 0, count)
+	rows := make([]model.KlineMin, 0, count)
 
 	var offset int
 	for i := 0; i < count; i++ {
@@ -177,7 +177,7 @@ func processMinFile(data []byte, symbol string) ([]model.StockMinData, error) {
 			continue
 		}
 
-		rows = append(rows, model.StockMinData{
+		rows = append(rows, model.KlineMin{
 			Symbol:   symbol,
 			Open:     float64(openRaw) / 100.0,
 			High:     float64(highRaw) / 100.0,

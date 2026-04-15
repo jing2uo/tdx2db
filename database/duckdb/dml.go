@@ -44,16 +44,16 @@ func (d *DuckDBDriver) TruncateTable(meta *model.TableMeta) error {
 	return nil
 }
 
-func (d *DuckDBDriver) ImportDailyStocks(path string) error {
-	return d.importCSV(model.TableStocksDaily, path)
+func (d *DuckDBDriver) ImportKlineDaily(path string) error {
+	return d.importCSV(model.TableKlineDaily, path)
 }
 
-func (d *DuckDBDriver) Import1MinStocks(path string) error {
-	return d.importCSV(model.TableStocks1Min, path)
+func (d *DuckDBDriver) ImportKline1Min(path string) error {
+	return d.importCSV(model.TableKline1Min, path)
 }
 
-func (d *DuckDBDriver) Import5MinStocks(path string) error {
-	return d.importCSV(model.TableStocks5Min, path)
+func (d *DuckDBDriver) ImportKline5Min(path string) error {
+	return d.importCSV(model.TableKline5Min, path)
 }
 
 func (d *DuckDBDriver) ImportGBBQ(path string) error {
@@ -116,31 +116,68 @@ func (d *DuckDBDriver) GetLatestDate(tableName string, dateCol string) (time.Tim
 	return latest.Time, nil
 }
 
-func (d *DuckDBDriver) GetAllSymbols() ([]string, error) {
-	query := fmt.Sprintf("SELECT DISTINCT symbol FROM %s", model.TableStocksDaily.TableName)
+func (d *DuckDBDriver) GetSymbolsByClass(class string) ([]string, error) {
+	query := fmt.Sprintf(
+		"SELECT symbol FROM %s WHERE class = ? ORDER BY symbol",
+		model.TableSymbolClass.TableName,
+	)
 
 	var symbols []string
-	err := d.db.Select(&symbols, query)
+	err := d.db.Select(&symbols, query, class)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query symbols: %w", err)
+		return nil, fmt.Errorf("failed to query symbols by class: %w", err)
 	}
 
 	return symbols, nil
 }
 
-func (d *DuckDBDriver) CountStocksDaily() (int64, error) {
-	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", model.TableStocksDaily.TableName)
+func (d *DuckDBDriver) RebuildSymbolClass() error {
+	kline := model.TableKlineDaily.TableName
+	class := model.TableSymbolClass.TableName
+
+	var codes []string
+	if err := d.db.Select(&codes, fmt.Sprintf("SELECT DISTINCT symbol FROM %s", kline)); err != nil {
+		return fmt.Errorf("failed to collect symbols: %w", err)
+	}
+
+	tx, err := d.db.Beginx()
+	if err != nil {
+		return fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(fmt.Sprintf("DELETE FROM %s", class)); err != nil {
+		return fmt.Errorf("failed to clear symbol_class: %w", err)
+	}
+
+	stmt, err := tx.Preparex(fmt.Sprintf("INSERT INTO %s (symbol, class) VALUES (?, ?)", class))
+	if err != nil {
+		return fmt.Errorf("failed to prepare insert: %w", err)
+	}
+	defer stmt.Close()
+
+	for _, c := range codes {
+		if _, err := stmt.Exec(c, model.ClassifyCode(c)); err != nil {
+			return fmt.Errorf("failed to insert class for %s: %w", c, err)
+		}
+	}
+
+	return tx.Commit()
+}
+
+func (d *DuckDBDriver) CountKlineDaily() (int64, error) {
+	query := fmt.Sprintf("SELECT COUNT(*) FROM %s", model.TableKlineDaily.TableName)
 
 	var count int64
 	err := d.db.Get(&count, query)
 	if err != nil {
-		return 0, fmt.Errorf("failed to count stocks: %w", err)
+		return 0, fmt.Errorf("failed to count kline daily: %w", err)
 	}
 
 	return count, nil
 }
 
-func (d *DuckDBDriver) QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error) {
+func (d *DuckDBDriver) QueryKlineDaily(symbol string, startDate, endDate *time.Time) ([]model.KlineDay, error) {
 
 	conditions := []string{"symbol = ?"}
 	args := []interface{}{symbol}
@@ -156,13 +193,13 @@ func (d *DuckDBDriver) QueryStockData(symbol string, startDate, endDate *time.Ti
 
 	query := fmt.Sprintf(
 		`SELECT * FROM %s WHERE %s ORDER BY date ASC`,
-		model.TableStocksDaily.TableName,
+		model.TableKlineDaily.TableName,
 		strings.Join(conditions, " AND "),
 	)
 
-	var results []model.StockData
+	var results []model.KlineDay
 	if err := d.db.Select(&results, query, args...); err != nil {
-		return nil, fmt.Errorf("failed to query stocks: %w", err)
+		return nil, fmt.Errorf("failed to query kline daily: %w", err)
 	}
 
 	return results, nil

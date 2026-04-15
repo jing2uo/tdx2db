@@ -38,7 +38,7 @@ func ExportStockBasicToCSV(
 	}
 	gbbqIndex := buildGbbqIndex(gbbqData)
 
-	symbols, err := db.GetAllSymbols()
+	symbols, err := db.GetSymbolsByClass(model.ClassStock)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
 	}
@@ -84,7 +84,7 @@ func ExportStockBasicToCSV(
 }
 
 func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, error) {
-	stockData, err := bc.DB.QueryStockData(symbol, nil, nil)
+	stockData, err := bc.DB.QueryKlineDaily(symbol, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("query stock %s failed: %w", symbol, err)
 	}
@@ -109,7 +109,7 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 }
 
 func CalculateStockBasic(
-	stockData []model.StockData,
+	stockData []model.KlineDay,
 	gbbqData []model.GbbqData,
 ) ([]*model.StockBasic, error) {
 

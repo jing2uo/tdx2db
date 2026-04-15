@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type StockData struct {
+type KlineDay struct {
 	Symbol string    `col:"symbol"`
 	Open   float64   `col:"open"`
 	High   float64   `col:"high"`
@@ -13,7 +13,7 @@ type StockData struct {
 	Date   time.Time `col:"date" type:"date"`
 }
 
-type StockMinData struct {
+type KlineMin struct {
 	Symbol   string    `col:"symbol"`
 	Open     float64   `col:"open"`
 	High     float64   `col:"high"`
@@ -22,6 +22,11 @@ type StockMinData struct {
 	Amount   float64   `col:"amount"`
 	Volume   int64     `col:"volume"`
 	Datetime time.Time `col:"datetime" type:"datetime" `
+}
+
+type SymbolClass struct {
+	Symbol string `col:"symbol"`
+	Class  string `col:"class"`
 }
 
 type Factor struct {

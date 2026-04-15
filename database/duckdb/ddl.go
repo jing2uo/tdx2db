@@ -78,7 +78,7 @@ func (d *DuckDBDriver) registerViews() {
 		`,
 			model.ViewDailyBFQ,
 			model.TableAdjustFactor.TableName,
-			model.TableStocksDaily.TableName,
+			model.TableKlineDaily.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
@@ -111,7 +111,7 @@ func (d *DuckDBDriver) registerViews() {
 			LEFT JOIN %s b ON s.symbol = b.symbol AND s.date = b.date
 		`,
 			model.ViewDailyHFQ,
-			model.TableStocksDaily.TableName,
+			model.TableKlineDaily.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)
@@ -151,7 +151,7 @@ func (d *DuckDBDriver) registerViews() {
 		`,
 			model.ViewDailyQFQ,
 			model.TableAdjustFactor.TableName,
-			model.TableStocksDaily.TableName,
+			model.TableKlineDaily.TableName,
 			model.TableAdjustFactor.TableName,
 			model.TableBasic.TableName,
 		)

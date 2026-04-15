@@ -28,7 +28,7 @@ func Init(ctx context.Context, dbURI, dayFileDir string) error {
 		return err
 	}
 
-	count, err := db.CountStocksDaily()
+	count, err := db.CountKlineDaily()
 	if err != nil {
 		return fmt.Errorf("failed to check database status: %w", err)
 	}

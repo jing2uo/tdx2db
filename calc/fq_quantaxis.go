@@ -21,7 +21,7 @@ func ExportFactorsToCSV(
 	db database.DataRepository,
 	csvPath string,
 ) (int, error) {
-	symbols, err := db.GetAllSymbols()
+	symbols, err := db.GetSymbolsByClass(model.ClassStock)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
 	}

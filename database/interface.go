@@ -12,9 +12,9 @@ type DataRepository interface {
 
 	InitSchema() error
 
-	ImportDailyStocks(csvPath string) error
-	Import1MinStocks(csvPath string) error
-	Import5MinStocks(csvPath string) error
+	ImportKlineDaily(csvPath string) error
+	ImportKline1Min(csvPath string) error
+	ImportKline5Min(csvPath string) error
 	ImportAdjustFactors(csvPath string) error
 	ImportGBBQ(csvPath string) error
 	ImportBasic(csvPath string) error
@@ -24,10 +24,11 @@ type DataRepository interface {
 
 	TruncateTable(meta *model.TableMeta) error
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
-	QueryStockData(symbol string, startDate, endDate *time.Time) ([]model.StockData, error)
+	QueryKlineDaily(symbol string, startDate, endDate *time.Time) ([]model.KlineDay, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)
-	GetAllSymbols() ([]string, error)
-	CountStocksDaily() (int64, error)
+	GetSymbolsByClass(class string) ([]string, error)
+	RebuildSymbolClass() error
+	CountKlineDaily() (int64, error)
 
 	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
 
