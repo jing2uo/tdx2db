@@ -29,6 +29,7 @@ func init() {
 	TaskUpdateDaily = &Task{
 		Name:      "update_daily",
 		DependsOn: []string{},
+		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedDaily }),
 		Executor:  executeUpdateDaily,
 	}
 
@@ -41,18 +42,21 @@ func init() {
 	TaskUpdateGBBQ = &Task{
 		Name:      "update_gbbq",
 		DependsOn: []string{},
+		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedGbbq }),
 		Executor:  executeUpdateGBBQ,
 	}
 
 	TaskCalcBasic = &Task{
 		Name:      "calc_basic",
 		DependsOn: []string{"update_daily", "update_gbbq"},
+		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedBasic }),
 		Executor:  executeCalcBasic,
 	}
 
 	TaskCalcFactor = &Task{
 		Name:      "calc_factor",
 		DependsOn: []string{"calc_basic"},
+		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedFactor }),
 		Executor:  executeCalcFactor,
 	}
 
@@ -81,8 +85,19 @@ func init() {
 	TaskUpdateHolidays = &Task{
 		Name:      "update_holidays",
 		DependsOn: []string{"update_gbbq"},
+		SkipIf:    skipIfPlan(func(p *WorkPlan) bool { return !p.NeedHolidays }),
 		Executor:  executeUpdateHolidays,
 		OnError:   ErrorModeSkip,
+	}
+}
+
+// skipIfPlan 仅在 Plan 存在且谓词判为 true 时跳过；Plan 为 nil（如 init 流程）时保持原行为。
+func skipIfPlan(predicate func(*WorkPlan) bool) SkipCondition {
+	return func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+		if args.Plan == nil {
+			return false
+		}
+		return predicate(args.Plan)
 	}
 }
 
@@ -390,7 +405,20 @@ func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, 
 
 			validDates = append(validDates, date)
 		case 404:
-			fmt.Printf("🟡 %s 非交易日或数据尚未更新\n", dateStr)
+			var cal *TradingCalendar
+			if args.Plan != nil {
+				cal = args.Plan.Calendar
+			}
+			switch {
+			case cal != nil && cal.IsHoliday(date):
+				fmt.Printf("🎉 %s 为节假日，跳过\n", dateStr)
+			case cal != nil && cal.IsWeekend(date):
+				fmt.Printf("🌴 %s 为周末，跳过\n", dateStr)
+			case date.Equal(args.Today):
+				fmt.Printf("⏳ %s 数据尚未发布，请等待收盘后重试\n", dateStr)
+			default:
+				fmt.Printf("🟡 %s 数据尚未发布\n", dateStr)
+			}
 			continue
 		default:
 			if err != nil {
