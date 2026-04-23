@@ -167,7 +167,7 @@ jobs:
         id: tags
         run: |
           VERSION="${GITHUB_REF_NAME}"
-          IMAGE="ghcr.io/jing2uo/tdx2db"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
           TAGS="${IMAGE}:${VERSION}"
           if [[ "${GITHUB_REF_NAME}" != *-* ]]; then
             TAGS="${TAGS},${IMAGE}:latest"
