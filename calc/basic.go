@@ -25,8 +25,8 @@ type BasicContext struct {
 	GbbqIndex GbbqIndex
 }
 
-// ExportStockBasicToCSV 计算并导出 StockBasic 数据
-func ExportStockBasicToCSV(
+// ExportBasicDailyToCSV 计算并导出 BasicDaily 数据 (覆盖 stock + etf)。
+func ExportBasicDailyToCSV(
 	ctx context.Context,
 	db database.DataRepository,
 	csvPath string,
@@ -38,12 +38,12 @@ func ExportStockBasicToCSV(
 	}
 	gbbqIndex := buildGbbqIndex(gbbqData)
 
-	symbols, err := db.GetSymbolsByClass(model.ClassStock)
+	symbols, err := db.GetSymbolsByClass(model.ClassStock, model.ClassETF)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
 	}
 
-	cw, err := utils.NewCSVWriter[model.StockBasic](csvPath)
+	cw, err := utils.NewCSVWriter[model.BasicDaily](csvPath)
 	if err != nil {
 		return 0, err
 	}
@@ -54,20 +54,20 @@ func ExportStockBasicToCSV(
 		GbbqIndex: gbbqIndex,
 	}
 
-	pipeline := utils.NewPipeline[string, model.StockBasic]()
+	pipeline := utils.NewPipeline[string, model.BasicDaily]()
 
 	result, err := pipeline.Run(
 		ctx,
 		symbols,
-		func(ctx context.Context, symbol string) ([]model.StockBasic, error) {
+		func(ctx context.Context, symbol string) ([]model.BasicDaily, error) {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			default:
 			}
-			return processStockBasic(basicCtx, symbol)
+			return processBasicDaily(basicCtx, symbol)
 		},
-		func(rows []model.StockBasic) error {
+		func(rows []model.BasicDaily) error {
 			return cw.Write(rows)
 		},
 	)
@@ -83,7 +83,7 @@ func ExportStockBasicToCSV(
 	return int(result.OutputRows), nil
 }
 
-func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, error) {
+func processBasicDaily(bc *BasicContext, symbol string) ([]model.BasicDaily, error) {
 	stockData, err := bc.DB.QueryKlineDaily(symbol, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("query stock %s failed: %w", symbol, err)
@@ -95,12 +95,12 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 
 	gbbqs := getGbbqBySymbol(bc.GbbqIndex, symbol)
 
-	basics, err := CalculateStockBasic(stockData, gbbqs)
+	basics, err := CalculateBasicDaily(stockData, gbbqs)
 	if err != nil {
 		return nil, fmt.Errorf("calc %s failed: %w", symbol, err)
 	}
 
-	result := make([]model.StockBasic, len(basics))
+	result := make([]model.BasicDaily, len(basics))
 	for i, b := range basics {
 		result[i] = *b
 	}
@@ -108,16 +108,16 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 	return result, nil
 }
 
-func CalculateStockBasic(
+func CalculateBasicDaily(
 	stockData []model.KlineDay,
 	gbbqData []model.GbbqData,
-) ([]*model.StockBasic, error) {
+) ([]*model.BasicDaily, error) {
 
 	if len(stockData) == 0 {
-		return []*model.StockBasic{}, nil
+		return []*model.BasicDaily{}, nil
 	}
 
-	results := make([]*model.StockBasic, len(stockData))
+	results := make([]*model.BasicDaily, len(stockData))
 	dateMap := make(map[string]int, len(stockData))
 	dateFormat := "2006-01-02"
 
@@ -128,6 +128,10 @@ func CalculateStockBasic(
 	xdxrMap := make(map[int]*xdxrInfo)
 	sharesList := make([]model.GbbqData, 0, len(gbbqData))
 
+	// 已知遗漏: ETF cat=11 (份额拆分/折算) 未处理。c3 表示 1 份拆分成 c3 份,
+	// 拆分日 PreClose 应除以 c3, 流通/总份额应乘以 c3。
+	// 影响范围:仅 ETF 拆分日的当日 PreClose/ChangePercent 失真,以及拆分后的
+	// Turnover/MV 失准。多数 ETF 一辈子不拆分,全市场每月 1-3 例。
 	for _, item := range gbbqData {
 		if item.Category == 1 {
 			dateStr := item.Date.Format(dateFormat)
@@ -178,7 +182,7 @@ func CalculateStockBasic(
 	}
 
 	for i, sd := range stockData {
-		basic := &model.StockBasic{
+		basic := &model.BasicDaily{
 			Date:   sd.Date,
 			Symbol: sd.Symbol,
 			Close:  sd.Close,

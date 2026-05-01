@@ -27,11 +27,11 @@ type DataRepository interface {
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
 	QueryKlineDaily(symbol string, startDate, endDate *time.Time) ([]model.KlineDay, error)
 	GetLatestDate(tableName string, dateCol string) (time.Time, error)
-	GetSymbolsByClass(class string) ([]string, error)
+	GetSymbolsByClass(classes ...string) ([]string, error)
 	RebuildSymbolClass() error
 	CountKlineDaily() (int64, error)
 
-	GetBasicsBySymbol(symbol string) ([]model.StockBasic, error)
+	GetBasicsBySymbol(symbol string) ([]model.BasicDaily, error)
 
 	GetGbbq() ([]model.GbbqData, error)
 	GetHolidays() ([]time.Time, error)

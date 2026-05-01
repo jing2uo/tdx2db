@@ -62,7 +62,7 @@ func (d *DuckDBDriver) ImportGBBQ(path string) error {
 }
 
 func (d *DuckDBDriver) ImportBasic(path string) error {
-	return d.importCSV(model.TableBasic, path)
+	return d.importCSV(model.TableBasicDaily, path)
 }
 
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
@@ -107,18 +107,25 @@ func (d *DuckDBDriver) GetLatestDate(tableName string, dateCol string) (time.Tim
 	return latest.Time, nil
 }
 
-func (d *DuckDBDriver) GetSymbolsByClass(class string) ([]string, error) {
+func (d *DuckDBDriver) GetSymbolsByClass(classes ...string) ([]string, error) {
+	if len(classes) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.Repeat("?,", len(classes))
+	placeholders = placeholders[:len(placeholders)-1]
 	query := fmt.Sprintf(
-		"SELECT symbol FROM %s WHERE class = ? ORDER BY symbol",
-		model.TableSymbolClass.TableName,
+		"SELECT symbol FROM %s WHERE class IN (%s) ORDER BY symbol",
+		model.TableSymbolClass.TableName, placeholders,
 	)
-
-	var symbols []string
-	err := d.db.Select(&symbols, query, class)
-	if err != nil {
-		return nil, fmt.Errorf("failed to query symbols by class: %w", err)
+	args := make([]any, len(classes))
+	for i, c := range classes {
+		args[i] = c
 	}
 
+	var symbols []string
+	if err := d.db.Select(&symbols, query, args...); err != nil {
+		return nil, fmt.Errorf("failed to query symbols by class: %w", err)
+	}
 	return symbols, nil
 }
 
@@ -196,13 +203,13 @@ func (d *DuckDBDriver) QueryKlineDaily(symbol string, startDate, endDate *time.T
 	return results, nil
 }
 
-func (d *DuckDBDriver) GetBasicsBySymbol(symbol string) ([]model.StockBasic, error) {
+func (d *DuckDBDriver) GetBasicsBySymbol(symbol string) ([]model.BasicDaily, error) {
 	query := fmt.Sprintf(
 		"SELECT * FROM %s WHERE symbol = ? ORDER BY date",
-		model.TableBasic.TableName,
+		model.TableBasicDaily.TableName,
 	)
 
-	var results []model.StockBasic
+	var results []model.BasicDaily
 	if err := d.db.Select(&results, query, symbol); err != nil {
 		return nil, fmt.Errorf("failed to query daily basics by symbol %s: %w", symbol, err)
 	}

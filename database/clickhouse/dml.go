@@ -92,7 +92,7 @@ func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 }
 
 func (d *ClickHouseDriver) ImportBasic(path string) error {
-	return d.importCSV(model.TableBasic, path)
+	return d.importCSV(model.TableBasicDaily, path)
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
@@ -132,15 +132,23 @@ func (d *ClickHouseDriver) GetLatestDate(tableName string, dateCol string) (time
 	return latest.Time, nil
 }
 
-func (d *ClickHouseDriver) GetSymbolsByClass(class string) ([]string, error) {
+func (d *ClickHouseDriver) GetSymbolsByClass(classes ...string) ([]string, error) {
+	if len(classes) == 0 {
+		return nil, nil
+	}
+	placeholders := strings.Repeat("?,", len(classes))
+	placeholders = placeholders[:len(placeholders)-1]
 	query := fmt.Sprintf(
-		"SELECT symbol FROM %s WHERE class = ? ORDER BY symbol",
-		model.TableSymbolClass.TableName,
+		"SELECT symbol FROM %s WHERE class IN (%s) ORDER BY symbol",
+		model.TableSymbolClass.TableName, placeholders,
 	)
+	args := make([]any, len(classes))
+	for i, c := range classes {
+		args[i] = c
+	}
 
 	var symbols []string
-	err := d.db.Select(&symbols, query, class)
-	if err != nil {
+	if err := d.db.Select(&symbols, query, args...); err != nil {
 		return nil, fmt.Errorf("failed to query symbols by class: %w", err)
 	}
 	return symbols, nil
@@ -218,13 +226,13 @@ func (d *ClickHouseDriver) QueryKlineDaily(symbol string, startDate, endDate *ti
 	return results, nil
 }
 
-func (d *ClickHouseDriver) GetBasicsBySymbol(symbol string) ([]model.StockBasic, error) {
+func (d *ClickHouseDriver) GetBasicsBySymbol(symbol string) ([]model.BasicDaily, error) {
 	query := fmt.Sprintf(
 		"SELECT * FROM %s WHERE symbol = ? ORDER BY date",
-		model.TableBasic.TableName,
+		model.TableBasicDaily.TableName,
 	)
 
-	var results []model.StockBasic
+	var results []model.BasicDaily
 	if err := d.db.Select(&results, query, symbol); err != nil {
 		return nil, fmt.Errorf("failed to query daily basics by symbol %s: %w", symbol, err)
 	}

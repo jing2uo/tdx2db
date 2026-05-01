@@ -149,9 +149,9 @@ var TableGbbq = SchemaFromStruct(
 	[]string{"symbol", "date"},
 )
 
-var TableBasic = SchemaFromStruct(
-	"raw_stocks_basic",
-	StockBasic{},
+var TableBasicDaily = SchemaFromStruct(
+	"raw_basic_daily",
+	BasicDaily{},
 	[]string{"symbol", "date"},
 )
 

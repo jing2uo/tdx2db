@@ -21,7 +21,7 @@ func ExportFactorsToCSV(
 	db database.DataRepository,
 	csvPath string,
 ) (int, error) {
-	symbols, err := db.GetSymbolsByClass(model.ClassStock)
+	symbols, err := db.GetSymbolsByClass(model.ClassStock, model.ClassETF)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
 	}
@@ -83,7 +83,7 @@ func processFactorSymbol(fctx *FactorContext, symbol string) ([]model.Factor, er
 
 // calculateFullHfq 全量计算 HFQ（每天一条记录）
 // basic.PreClose 已包含除权调整，prevClose != PreClose 即为除权日，无需独立的 xdxr 日期集合
-func calculateFullHfq(basics []model.StockBasic) []model.Factor {
+func calculateFullHfq(basics []model.BasicDaily) []model.Factor {
 	if len(basics) == 0 {
 		return nil
 	}

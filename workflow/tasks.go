@@ -194,7 +194,7 @@ func executeCalcBasic(ctx context.Context, db database.DataRepository, args *Tas
 	fmt.Println("📟 计算股票基础行情")
 	basicCSV := filepath.Join(args.TempDir, "basics.csv")
 
-	rowCount, err := calc.ExportStockBasicToCSV(ctx, db, basicCSV)
+	rowCount, err := calc.ExportBasicDailyToCSV(ctx, db, basicCSV)
 	if err != nil {
 		return nil, fmt.Errorf("failed to export basic to csv: %w", err)
 	}
@@ -204,7 +204,7 @@ func executeCalcBasic(ctx context.Context, db database.DataRepository, args *Tas
 		return &TaskResult{State: StateSkipped, Message: "no new basic data"}, nil
 	}
 
-	db.TruncateTable(model.TableBasic)
+	db.TruncateTable(model.TableBasicDaily)
 	if err := db.ImportBasic(basicCSV); err != nil {
 		return nil, fmt.Errorf("failed to import basic data: %w", err)
 	}

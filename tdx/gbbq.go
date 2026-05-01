@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/jing2uo/tdx2db/model"
-	"github.com/jing2uo/tdx2db/utils"
 )
 
 func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
@@ -68,7 +67,7 @@ func DecodeGbbqFile(gbbqFile string) ([]model.GbbqData, error) {
 		code := string(codeBytes[:strLen])
 
 		// 生成 Symbol 并过滤
-		symbol, ok := utils.GenerateSymbol(code)
+		symbol, ok := model.SymbolFromCode(code)
 		if !ok {
 			continue // 没匹配到规则，跳过
 		}

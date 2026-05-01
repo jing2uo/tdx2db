@@ -57,7 +57,7 @@ func BuildWorkPlan(db database.DataRepository, today time.Time) (*WorkPlan, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest daily date: %w", err)
 	}
-	basicLatest, err := db.GetLatestDate(model.TableBasic.TableName, "date")
+	basicLatest, err := db.GetLatestDate(model.TableBasicDaily.TableName, "date")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest basic date: %w", err)
 	}
