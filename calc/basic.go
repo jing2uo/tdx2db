@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
@@ -16,6 +17,9 @@ type xdxrInfo struct {
 	Peigu       float64
 	Peigujia    float64
 	Songzhuangu float64
+	// Splitc3: ETF/LOF cat=11 份额折算系数。new_units = old_units * Splitc3,
+	// new_NAV = old_NAV / Splitc3。多次折算同日累乘。
+	Splitc3 float64
 }
 
 type GbbqIndex map[string][]model.GbbqData
@@ -128,24 +132,35 @@ func CalculateBasicDaily(
 	xdxrMap := make(map[int]*xdxrInfo)
 	sharesList := make([]model.GbbqData, 0, len(gbbqData))
 
-	// 已知遗漏: ETF cat=11 (份额拆分/折算) 未处理。c3 表示 1 份拆分成 c3 份,
-	// 拆分日 PreClose 应除以 c3, 流通/总份额应乘以 c3。
-	// 影响范围:仅 ETF 拆分日的当日 PreClose/ChangePercent 失真,以及拆分后的
-	// Turnover/MV 失准。多数 ETF 一辈子不拆分,全市场每月 1-3 例。
+	// 把 gbbq 事件日期映射到 stockData 索引;非交易日落在记录日的下一个交易日。
+	findIdx := func(d time.Time) (int, bool) {
+		if i, ok := dateMap[d.Format(dateFormat)]; ok {
+			return i, true
+		}
+		i := sort.Search(len(stockData), func(i int) bool {
+			return !stockData[i].Date.Before(d)
+		})
+		if i < len(stockData) {
+			return i, true
+		}
+		return 0, false
+	}
+
+	// 处理 gbbq 事件:
+	//   cat=1: 分红/送转股/配股, 调整除权日 PreClose
+	//   cat=11: ETF/LOF 份额折算, c3 = 折算系数, PreClose 除以 c3
+	//   cat∈{2,3,5,7,8,9,10}: 累积流通/总股本变化 (ETF 一般无此类记录)
 	for _, item := range gbbqData {
-		if item.Category == 1 {
-			dateStr := item.Date.Format(dateFormat)
-			if idx, exists := dateMap[dateStr]; exists {
+		switch {
+		case item.Category == 1:
+			if idx, ok := findIdx(item.Date); ok {
 				mergeXdxrFromGbbq(xdxrMap, idx, item)
-			} else {
-				idx := sort.Search(len(stockData), func(i int) bool {
-					return !stockData[i].Date.Before(item.Date)
-				})
-				if idx < len(stockData) {
-					mergeXdxrFromGbbq(xdxrMap, idx, item)
-				}
 			}
-		} else if isShareCategory(item.Category) {
+		case item.Category == 11 && item.C3 > 0:
+			if idx, ok := findIdx(item.Date); ok {
+				mergeSplitFromGbbq(xdxrMap, idx, item)
+			}
+		case isShareCategory(item.Category):
 			sharesList = append(sharesList, item)
 		}
 	}
@@ -266,6 +281,20 @@ func mergeXdxrFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
 	}
 }
 
+// mergeSplitFromGbbq 处理 cat=11 份额折算事件。c3 是折算系数,
+// 同日多次折算累乘 (罕见但理论可能)。
+func mergeSplitFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
+	if _, ok := m[idx]; !ok {
+		m[idx] = &xdxrInfo{}
+	}
+	info := m[idx]
+	if info.Splitc3 > 0 {
+		info.Splitc3 *= data.C3
+	} else {
+		info.Splitc3 = data.C3
+	}
+}
+
 func calculatePreClosePrice(prevClose float64, info *xdxrInfo) float64 {
 	if info == nil {
 		return prevClose
@@ -275,5 +304,9 @@ func calculatePreClosePrice(prevClose float64, info *xdxrInfo) float64 {
 		return prevClose
 	}
 	numerator := (prevClose*10 - info.Fenhong) + (info.Peigu * info.Peigujia)
-	return numerator / denominator
+	price := numerator / denominator
+	if info.Splitc3 > 0 {
+		price /= info.Splitc3
+	}
+	return price
 }
