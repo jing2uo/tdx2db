@@ -111,6 +111,7 @@ func processDayFile(data []byte, symbol string) ([]model.KlineDay, error) {
 	}
 	count := n / recordSize
 	rows := make([]model.KlineDay, 0, count)
+	scale := model.PriceScale(symbol)
 
 	var offset int
 	for i := 0; i < count; i++ {
@@ -136,10 +137,10 @@ func processDayFile(data []byte, symbol string) ([]model.KlineDay, error) {
 
 		rows = append(rows, model.KlineDay{
 			Symbol: symbol,
-			Open:   float64(openRaw) / 100.0,
-			High:   float64(highRaw) / 100.0,
-			Low:    float64(lowRaw) / 100.0,
-			Close:  float64(closeRaw) / 100.0,
+			Open:   float64(openRaw) / scale,
+			High:   float64(highRaw) / scale,
+			Low:    float64(lowRaw) / scale,
+			Close:  float64(closeRaw) / scale,
 			Amount: float64(amount),
 			Volume: volume,
 			Date:   t,
@@ -155,6 +156,7 @@ func processMinFile(data []byte, symbol string) ([]model.KlineMin, error) {
 	}
 	count := n / recordSize
 	rows := make([]model.KlineMin, 0, count)
+	scale := model.PriceScale(symbol)
 
 	var offset int
 	for i := 0; i < count; i++ {
@@ -179,10 +181,10 @@ func processMinFile(data []byte, symbol string) ([]model.KlineMin, error) {
 
 		rows = append(rows, model.KlineMin{
 			Symbol:   symbol,
-			Open:     float64(openRaw) / 100.0,
-			High:     float64(highRaw) / 100.0,
-			Low:      float64(lowRaw) / 100.0,
-			Close:    float64(closeRaw) / 100.0,
+			Open:     float64(openRaw) / scale,
+			High:     float64(highRaw) / scale,
+			Low:      float64(lowRaw) / scale,
+			Close:    float64(closeRaw) / scale,
 			Amount:   float64(amount),
 			Volume:   int64(volRaw),
 			Datetime: t,

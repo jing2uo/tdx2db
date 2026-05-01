@@ -74,7 +74,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		fmt.Printf("📦 开始处理日线目录: %s\n", opts.InputPath)
 		output := filepath.Join(opts.OutputPath, "tdx2db_day.csv")
 
-		fmt.Println("🐢 开始转换日线数据")
+		fmt.Println("🐌 开始转换日线数据")
 		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".day")
 		if err != nil {
 			return fmt.Errorf("failed to convert day files: %w", err)
@@ -86,7 +86,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
 		output := filepath.Join(opts.OutputPath, "tdx2db_1min.csv")
 
-		fmt.Println("🐢 开始转换 1 分钟数据")
+		fmt.Println("🐌 开始转换 1 分钟数据")
 		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1min files: %w", err)
@@ -98,7 +98,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
 		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
 
-		fmt.Println("🐢 开始转换 5 分钟数据")
+		fmt.Println("🐌 开始转换 5 分钟数据")
 		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5min files: %w", err)
@@ -127,7 +127,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		default:
 		}
 
-		fmt.Printf("🐢 开始转档分笔数据\n")
+		fmt.Printf("🐌 开始转档分笔数据\n")
 		if err := tdx.DatatoolCreate(dataDir, "tick", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolTickCreate: %w", err)
 		}
@@ -138,7 +138,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.csv", baseName))
 		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
-		fmt.Printf("🐢 开始转换 1 分钟数据\n")
+		fmt.Printf("🐌 开始转换 1 分钟数据\n")
 		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, min1_output, ".01")
 		if err != nil {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
@@ -151,7 +151,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		default:
 		}
 
-		fmt.Printf("🐢 开始转换 5 分钟数据\n")
+		fmt.Printf("🐌 开始转换 5 分钟数据\n")
 		_, err = tdx.ConvertFilesToCSV(ctx, VipdocDir, min5_output, ".5")
 		if err != nil {
 			return fmt.Errorf("failed to convert 5-minute files: %w", err)
@@ -182,7 +182,7 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		default:
 		}
 
-		fmt.Printf("🐢 开始转换日线数据\n")
+		fmt.Printf("🐌 开始转换日线数据\n")
 		if err := tdx.DatatoolCreate(dataDir, "day", GetToday()); err != nil {
 			return fmt.Errorf("failed to execute DatatoolDayCreate: %w", err)
 		}

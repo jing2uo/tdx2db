@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"time"
 
 	"github.com/jing2uo/tdx2db/database"
 	"github.com/jing2uo/tdx2db/model"
@@ -16,6 +17,9 @@ type xdxrInfo struct {
 	Peigu       float64
 	Peigujia    float64
 	Songzhuangu float64
+	// Splitc3: ETF/LOF cat=11 份额折算系数。new_units = old_units * Splitc3,
+	// new_NAV = old_NAV / Splitc3。多次折算同日累乘。
+	Splitc3 float64
 }
 
 type GbbqIndex map[string][]model.GbbqData
@@ -25,8 +29,8 @@ type BasicContext struct {
 	GbbqIndex GbbqIndex
 }
 
-// ExportStockBasicToCSV 计算并导出 StockBasic 数据
-func ExportStockBasicToCSV(
+// ExportBasicDailyToCSV 计算并导出 BasicDaily 数据 (覆盖 stock + etf)。
+func ExportBasicDailyToCSV(
 	ctx context.Context,
 	db database.DataRepository,
 	csvPath string,
@@ -38,12 +42,12 @@ func ExportStockBasicToCSV(
 	}
 	gbbqIndex := buildGbbqIndex(gbbqData)
 
-	symbols, err := db.GetSymbolsByClass(model.ClassStock)
+	symbols, err := db.GetSymbolsByClass(model.ClassStock, model.ClassETF)
 	if err != nil {
 		return 0, fmt.Errorf("failed to query symbols: %w", err)
 	}
 
-	cw, err := utils.NewCSVWriter[model.StockBasic](csvPath)
+	cw, err := utils.NewCSVWriter[model.BasicDaily](csvPath)
 	if err != nil {
 		return 0, err
 	}
@@ -54,20 +58,20 @@ func ExportStockBasicToCSV(
 		GbbqIndex: gbbqIndex,
 	}
 
-	pipeline := utils.NewPipeline[string, model.StockBasic]()
+	pipeline := utils.NewPipeline[string, model.BasicDaily]()
 
 	result, err := pipeline.Run(
 		ctx,
 		symbols,
-		func(ctx context.Context, symbol string) ([]model.StockBasic, error) {
+		func(ctx context.Context, symbol string) ([]model.BasicDaily, error) {
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
 			default:
 			}
-			return processStockBasic(basicCtx, symbol)
+			return processBasicDaily(basicCtx, symbol)
 		},
-		func(rows []model.StockBasic) error {
+		func(rows []model.BasicDaily) error {
 			return cw.Write(rows)
 		},
 	)
@@ -83,7 +87,7 @@ func ExportStockBasicToCSV(
 	return int(result.OutputRows), nil
 }
 
-func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, error) {
+func processBasicDaily(bc *BasicContext, symbol string) ([]model.BasicDaily, error) {
 	stockData, err := bc.DB.QueryKlineDaily(symbol, nil, nil)
 	if err != nil {
 		return nil, fmt.Errorf("query stock %s failed: %w", symbol, err)
@@ -95,12 +99,12 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 
 	gbbqs := getGbbqBySymbol(bc.GbbqIndex, symbol)
 
-	basics, err := CalculateStockBasic(stockData, gbbqs)
+	basics, err := CalculateBasicDaily(stockData, gbbqs)
 	if err != nil {
 		return nil, fmt.Errorf("calc %s failed: %w", symbol, err)
 	}
 
-	result := make([]model.StockBasic, len(basics))
+	result := make([]model.BasicDaily, len(basics))
 	for i, b := range basics {
 		result[i] = *b
 	}
@@ -108,16 +112,16 @@ func processStockBasic(bc *BasicContext, symbol string) ([]model.StockBasic, err
 	return result, nil
 }
 
-func CalculateStockBasic(
+func CalculateBasicDaily(
 	stockData []model.KlineDay,
 	gbbqData []model.GbbqData,
-) ([]*model.StockBasic, error) {
+) ([]*model.BasicDaily, error) {
 
 	if len(stockData) == 0 {
-		return []*model.StockBasic{}, nil
+		return []*model.BasicDaily{}, nil
 	}
 
-	results := make([]*model.StockBasic, len(stockData))
+	results := make([]*model.BasicDaily, len(stockData))
 	dateMap := make(map[string]int, len(stockData))
 	dateFormat := "2006-01-02"
 
@@ -128,20 +132,35 @@ func CalculateStockBasic(
 	xdxrMap := make(map[int]*xdxrInfo)
 	sharesList := make([]model.GbbqData, 0, len(gbbqData))
 
+	// 把 gbbq 事件日期映射到 stockData 索引;非交易日落在记录日的下一个交易日。
+	findIdx := func(d time.Time) (int, bool) {
+		if i, ok := dateMap[d.Format(dateFormat)]; ok {
+			return i, true
+		}
+		i := sort.Search(len(stockData), func(i int) bool {
+			return !stockData[i].Date.Before(d)
+		})
+		if i < len(stockData) {
+			return i, true
+		}
+		return 0, false
+	}
+
+	// 处理 gbbq 事件:
+	//   cat=1: 分红/送转股/配股, 调整除权日 PreClose
+	//   cat=11: ETF/LOF 份额折算, c3 = 折算系数, PreClose 除以 c3
+	//   cat∈{2,3,5,7,8,9,10}: 累积流通/总股本变化 (ETF 一般无此类记录)
 	for _, item := range gbbqData {
-		if item.Category == 1 {
-			dateStr := item.Date.Format(dateFormat)
-			if idx, exists := dateMap[dateStr]; exists {
+		switch {
+		case item.Category == 1:
+			if idx, ok := findIdx(item.Date); ok {
 				mergeXdxrFromGbbq(xdxrMap, idx, item)
-			} else {
-				idx := sort.Search(len(stockData), func(i int) bool {
-					return !stockData[i].Date.Before(item.Date)
-				})
-				if idx < len(stockData) {
-					mergeXdxrFromGbbq(xdxrMap, idx, item)
-				}
 			}
-		} else if isShareCategory(item.Category) {
+		case item.Category == 11 && item.C3 > 0:
+			if idx, ok := findIdx(item.Date); ok {
+				mergeSplitFromGbbq(xdxrMap, idx, item)
+			}
+		case isShareCategory(item.Category):
 			sharesList = append(sharesList, item)
 		}
 	}
@@ -178,7 +197,7 @@ func CalculateStockBasic(
 	}
 
 	for i, sd := range stockData {
-		basic := &model.StockBasic{
+		basic := &model.BasicDaily{
 			Date:   sd.Date,
 			Symbol: sd.Symbol,
 			Close:  sd.Close,
@@ -262,6 +281,20 @@ func mergeXdxrFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
 	}
 }
 
+// mergeSplitFromGbbq 处理 cat=11 份额折算事件。c3 是折算系数,
+// 同日多次折算累乘 (罕见但理论可能)。
+func mergeSplitFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
+	if _, ok := m[idx]; !ok {
+		m[idx] = &xdxrInfo{}
+	}
+	info := m[idx]
+	if info.Splitc3 > 0 {
+		info.Splitc3 *= data.C3
+	} else {
+		info.Splitc3 = data.C3
+	}
+}
+
 func calculatePreClosePrice(prevClose float64, info *xdxrInfo) float64 {
 	if info == nil {
 		return prevClose
@@ -271,5 +304,9 @@ func calculatePreClosePrice(prevClose float64, info *xdxrInfo) float64 {
 		return prevClose
 	}
 	numerator := (prevClose*10 - info.Fenhong) + (info.Peigu * info.Peigujia)
-	return numerator / denominator
+	price := numerator / denominator
+	if info.Splitc3 > 0 {
+		price /= info.Splitc3
+	}
+	return price
 }

@@ -17,7 +17,7 @@ func date(y, m, d int) time.Time {
 func TestXdxrFactorUpdate(t *testing.T) {
 	// basic.PreClose 已由 calc/basic.go 正确计算（含非交易日映射）
 	// calculateFullHfq 只需检测 prevClose != PreClose
-	basics := []model.StockBasic{
+	basics := []model.BasicDaily{
 		{Symbol: "sz000001", Date: date(2007, 5, 31), Close: 28.69, PreClose: 27.32},
 		// 2007-06-18 除权（非交易日），basic.go 已映射到 2007-06-20 并调整 PreClose
 		{Symbol: "sz000001", Date: date(2007, 6, 20), Close: 31.19, PreClose: 26.081818181818186},
@@ -49,7 +49,7 @@ func TestXdxrFactorUpdate(t *testing.T) {
 
 // TestNoXdxrFactorUnchanged 验证无除权时因子保持不变
 func TestNoXdxrFactorUnchanged(t *testing.T) {
-	basics := []model.StockBasic{
+	basics := []model.BasicDaily{
 		{Symbol: "sz000001", Date: date(2020, 7, 20), Close: 15.0, PreClose: 14.5},
 		{Symbol: "sz000001", Date: date(2020, 7, 21), Close: 16.0, PreClose: 15.0},
 		{Symbol: "sz000001", Date: date(2020, 7, 22), Close: 15.5, PreClose: 16.0},

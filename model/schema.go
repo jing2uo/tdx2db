@@ -44,7 +44,9 @@ type Factor struct {
 	HfqFactor float64   `col:"hfq_factor"`
 }
 
-type StockBasic struct {
+// BasicDaily 是每日衍生指标(PreClose/涨跌幅/振幅/换手率/市值)。
+// 覆盖 stock + etf 两类 symbol。
+type BasicDaily struct {
 	Date          time.Time `col:"date" type:"date"`
 	Symbol        string    `col:"symbol"`
 	Close         float64   `col:"close"`

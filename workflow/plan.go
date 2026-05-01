@@ -45,7 +45,7 @@ func BuildWorkPlan(db database.DataRepository, today time.Time) (*WorkPlan, erro
 		plan.NeedBasic = true
 		plan.NeedFactor = true
 		plan.NeedHolidays = true
-		plan.Reason = "raw_holidays 为空，走完整流程"
+		plan.Reason = "🌱 raw_holidays 为空，走完整流程"
 		return plan, nil
 	}
 
@@ -57,7 +57,7 @@ func BuildWorkPlan(db database.DataRepository, today time.Time) (*WorkPlan, erro
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest daily date: %w", err)
 	}
-	basicLatest, err := db.GetLatestDate(model.TableBasic.TableName, "date")
+	basicLatest, err := db.GetLatestDate(model.TableBasicDaily.TableName, "date")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get latest basic date: %w", err)
 	}
@@ -68,7 +68,7 @@ func BuildWorkPlan(db database.DataRepository, today time.Time) (*WorkPlan, erro
 
 	// 空库：交给 init 流程；此处不标任何 Need，调用方自行决定。
 	if dailyLatest.IsZero() {
-		plan.Reason = "数据库无日线数据，请先运行 init"
+		plan.Reason = "🛑 数据库无日线数据，请先运行 init"
 		return plan, nil
 	}
 
