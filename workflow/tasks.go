@@ -132,7 +132,7 @@ func executeInitDaily(ctx context.Context, db database.DataRepository, args *Tas
 }
 
 func executeDailyImport(ctx context.Context, db database.DataRepository, args *TaskArgs, sourceDir string) (*TaskResult, error) {
-	fmt.Println("🐢 开始转换日线数据")
+	fmt.Println("🐌 开始转换日线数据")
 
 	stockDailyCSV := filepath.Join(args.TempDir, "stock.csv")
 
@@ -250,7 +250,7 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 	}
 
 	if len(validDates) > 0 {
-		fmt.Printf("🐢 开始转换1分钟分时数据\n")
+		fmt.Printf("🐌 开始转换1分钟分时数据\n")
 
 		stock1MinCSV := filepath.Join(args.TempDir, "1min.csv")
 
@@ -286,7 +286,7 @@ func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *Ta
 	}
 
 	if len(validDates) > 0 {
-		fmt.Printf("🐢 开始转换5分钟分时数据\n")
+		fmt.Printf("🐌 开始转换5分钟分时数据\n")
 
 		stock5MinCSV := filepath.Join(args.TempDir, "5min.csv")
 
@@ -377,7 +377,7 @@ func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, 
 		return nil, fmt.Errorf("failed to create target directory: %w", err)
 	}
 
-	fmt.Printf("🐢 开始下载%s数据\n", dataTypeCN)
+	fmt.Printf("🐌 开始下载%s数据\n", dataTypeCN)
 
 	validDates := make([]time.Time, 0, len(dates))
 
@@ -442,11 +442,11 @@ func prepareTdxData(ctx context.Context, latestDate time.Time, dataType string, 
 			}
 
 		case "tic":
-			fmt.Printf("🐢 开始转档分笔数据\n")
+			fmt.Printf("🐌 开始转档分笔数据\n")
 			if err := tdx.DatatoolCreate(args.TempDir, "tick", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 			}
-			fmt.Printf("🐢 开始转换分钟数据\n")
+			fmt.Printf("🐌 开始转换分钟数据\n")
 			if err := tdx.DatatoolCreate(args.TempDir, "min", endDate); err != nil {
 				return nil, fmt.Errorf("failed to run DatatoolMinCreate: %w", err)
 			}
