@@ -101,7 +101,7 @@ func ReadHolidays(filePath string) ([]model.Holiday, error) {
 	for _, dateStr := range allHolidays {
 		date, err := time.Parse("2006-01-02", dateStr)
 		if err != nil {
-			fmt.Printf("警告: 解析日期失败 %s: %v\n", dateStr, err)
+			fmt.Printf("⚠️  解析日期失败 %s: %v\n", dateStr, err)
 			continue
 		}
 		holidays = append(holidays, model.Holiday{Date: date})
