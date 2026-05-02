@@ -53,11 +53,12 @@
 **cron command flow (cmd/cron.go):**
 1. Create DB + Connect + InitSchema
 2. `checkSchemaVersion()` — reject if version missing or incompatible
-3. Run `GetUpdateTaskNames()` → DAG execution:
+3. `workflow.BuildWorkPlan(db, today)` — 读 raw_holidays + 各表最新日期，决定哪些任务要跑；全 Skip 则直接退出 (打印 plan.Reason)
+4. Run `GetUpdateTaskNames()` → DAG execution（任务用 plan.NeedXxx 通过 SkipIf 短路）：
    - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
-   - Optional: `update_1min`, `update_5min` (via --minline)
    - `update_holidays` 依赖 `update_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
-4. calc_basic and calc_factor run full recalculation (truncate + reimport)
+   - Optional: `update_1min`, `update_5min` (via --minline)
+5. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**
 - Types: `day`, `1min`, `5min`, `tic4`, `day4`
