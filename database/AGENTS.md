@@ -40,10 +40,11 @@
 - `Query()` - Generic query with conditions map
 - `QueryKlineDaily()` - Date range filtered OHLCV data
 - `GetLatestDate()` - Used by cron for incremental updates
-- `GetSymbolsByClass()` - Symbols filtered by class (stock/index/etf/block/unknown)
+- `GetSymbolsByClass(classes ...)` - Symbols filtered by class (calc 端传 stock + etf)
 - `RebuildSymbolClass()` - Rebuild symbol_class table from raw_kline_daily
-- `GetBasicsBySymbol()` - StockBasic data for factor calculation
+- `GetBasicsBySymbol()` - BasicDaily data (含 PreClose) for factor calculation
 - `GetGbbq()` - All gbbq records (loaded once, indexed in calc)
+- `GetHolidays()` - 全量节假日 (workflow.BuildWorkPlan 启动时读取)
 
 **CH import (clickhouse/dml.go):**
 - HTTP POST to `/` endpoint
@@ -74,8 +75,8 @@
 ## NOTES
 
 **Table naming:**
-- `raw_*` - Imported data tables (raw_kline_daily, raw_stocks_basic, raw_adjust_factor, raw_gbbq, raw_symbol_class, etc.)
-- `v_*` - Views (v_bfq_daily, v_qfq_daily, v_hfq_daily)
+- `raw_*` - Imported data tables (raw_kline_daily, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_kline_1min, raw_kline_5min)
+- `v_*` - Views (v_bfq_daily, v_qfq_daily, v_hfq_daily) - join `raw_symbol_class` 过滤 `class IN ('stock','etf')`
 - `_meta` - Schema version and metadata (key/value)
 - Tables auto-registered via `model.SchemaFromStruct()`, views via `model.DefineView()`
 - View implementations are driver-specific (registered in ddl.go via `registerViews()`)
