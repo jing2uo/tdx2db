@@ -13,7 +13,7 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
-func (d *ClickHouseDriver) importCSV(meta *model.TableMeta, filePath string) error {
+func (d *ClickHouseDriver) ImportCSV(meta *model.TableMeta, filePath string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return err
@@ -75,33 +75,29 @@ func (d *ClickHouseDriver) TruncateTable(meta *model.TableMeta) error {
 }
 
 func (d *ClickHouseDriver) ImportKlineDaily(path string) error {
-	return d.importCSV(model.TableKlineDaily, path)
+	return d.ImportCSV(model.TableKlineDaily, path)
 }
 
 func (d *ClickHouseDriver) ImportKline1Min(path string) error {
-	return d.importCSV(model.TableKline1Min, path)
-}
-
-func (d *ClickHouseDriver) ImportKline5Min(path string) error {
-	return d.importCSV(model.TableKline5Min, path)
+	return d.ImportCSV(model.TableKline1Min, path)
 }
 
 func (d *ClickHouseDriver) ImportGBBQ(path string) error {
 	d.TruncateTable(model.TableGbbq)
-	return d.importCSV(model.TableGbbq, path)
+	return d.ImportCSV(model.TableGbbq, path)
 }
 
 func (d *ClickHouseDriver) ImportBasic(path string) error {
-	return d.importCSV(model.TableBasicDaily, path)
+	return d.ImportCSV(model.TableBasicDaily, path)
 }
 
 func (d *ClickHouseDriver) ImportAdjustFactors(path string) error {
-	return d.importCSV(model.TableAdjustFactor, path)
+	return d.ImportCSV(model.TableAdjustFactor, path)
 }
 
 func (d *ClickHouseDriver) ImportHolidays(path string) error {
 	d.TruncateTable(model.TableHoliday)
-	return d.importCSV(model.TableHoliday, path)
+	return d.ImportCSV(model.TableHoliday, path)
 }
 
 func (d *ClickHouseDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

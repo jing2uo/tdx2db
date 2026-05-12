@@ -24,12 +24,11 @@ const (
 	TicZip
 	DayZip
 	Min1FileDir
-	Min5FileDir
 )
 
 func isDirType(t InputSourceType) bool {
 	switch t {
-	case DayFileDir, Min1FileDir, Min5FileDir:
+	case DayFileDir, Min1FileDir:
 		return true
 	default:
 		return false
@@ -94,18 +93,6 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 
 		fmt.Printf("🔥 转换完成: %s\n", output)
 
-	case Min5FileDir:
-		fmt.Printf("📦 开始处理分时数据目录: %s\n", opts.InputPath)
-		output := filepath.Join(opts.OutputPath, "tdx2db_5min.csv")
-
-		fmt.Println("🐌 开始转换 5 分钟数据")
-		_, err := tdx.ConvertFilesToCSV(ctx, opts.InputPath, output, ".5")
-		if err != nil {
-			return fmt.Errorf("failed to convert 5min files: %w", err)
-		}
-
-		fmt.Printf("🔥 转换完成: %s\n", output)
-
 	case TicZip:
 		fmt.Printf("📦 开始处理四代 TIC 压缩文件: %s\n", opts.InputPath)
 
@@ -136,7 +123,6 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 		}
 
 		min1_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_1min.csv", baseName))
-		min5_output := filepath.Join(opts.OutputPath, fmt.Sprintf("%s_5min.csv", baseName))
 
 		fmt.Printf("🐌 开始转换 1 分钟数据\n")
 		_, err := tdx.ConvertFilesToCSV(ctx, VipdocDir, min1_output, ".01")
@@ -144,22 +130,8 @@ func Convert(ctx context.Context, opts ConvertOptions) error {
 			return fmt.Errorf("failed to convert 1-minute files: %w", err)
 		}
 
-		// 检查取消
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		fmt.Printf("🐌 开始转换 5 分钟数据\n")
-		_, err = tdx.ConvertFilesToCSV(ctx, VipdocDir, min5_output, ".5")
-		if err != nil {
-			return fmt.Errorf("failed to convert 5-minute files: %w", err)
-		}
-
 		fmt.Printf("🔥 转换完成\n")
 		fmt.Printf("📊 1 分钟数据: %s\n", min1_output)
-		fmt.Printf("📊 5 分钟数据: %s\n", min5_output)
 
 	case DayZip:
 		fmt.Printf("📦 开始处理四代行情压缩文件: %s\n", opts.InputPath)

@@ -72,6 +72,7 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 }
 
 func (d *ClickHouseDriver) registerViews() {
+
 	// 不复权视图 (BFQ) — stock + etf
 	d.viewImpls[model.ViewDailyBFQ] = func() error {
 		query := fmt.Sprintf(`

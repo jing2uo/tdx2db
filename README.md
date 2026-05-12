@@ -15,7 +15,7 @@
 ## 亮点
 
 - **增量更新**: 支持间隔数天后数据补全，维护简单
-- **分时数据**: 支持导入 1min 和 5min 分时数据
+- **分时数据**: 支持导入 1 分钟分时数据
 - **复权计算**: 自动计算前后复权因子，因子支持分时使用
 - **衍生指标**: 自动计算换手率和市值信息
 - **稳定可靠**: 基于通达信数据，不依赖收费或限流接口
@@ -118,11 +118,11 @@ tdx2db cron --dburi 'duckdb://tdx.db'    # ClickHouse schema 参考 init 部分
 
 ### 分时数据
 
-cron 命令支持 1min 和 5min 分时数据导入。
+cron 命令支持 1 分钟分时数据导入。
 
 ```bash
-# --minline 可选 1、5、1,5 ，分别表示只处理1分钟、只处理5分钟、两种都处理
-tdx2db cron --dburi 'duckdb://tdx.db' --minline 1,5
+# 加 --min 才会下载并导入 1 分钟分时
+tdx2db cron --dburi 'duckdb://tdx.db' --min
 ```
 
 **注意**
@@ -143,7 +143,6 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 | `raw_gbbq`              | 股本变迁数据                  |
 | `raw_holidays`          | 假期日历                      |
 | `raw_kline_1min`        | 1 分钟 K 线                   |
-| `raw_kline_5min`        | 5 分钟 K 线                   |
 | `raw_kline_daily`       | 日线数据 (股票/指数/ETF/板块) |
 | `raw_basic_daily`       | 股票/ETF 前收盘价、换手率与市值 |
 | `raw_symbol_class`      | 品种分类 (stock/index/etf/等) |

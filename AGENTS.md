@@ -67,7 +67,7 @@ Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_m
 - DuckDB: `duckdb://[path]`
 
 **Table naming:**
-- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_kline_5min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays)
+- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays)
 - `v_*` — views (v_bfq_daily, v_qfq_daily, v_hfq_daily) — 通过 `raw_symbol_class` 过滤，仅保留 stock + etf
 - `_meta` — schema version metadata (key/value store)
 
@@ -77,7 +77,7 @@ Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_m
 - Use `model.Table*` / `model.MetaTable` constants for table references (never hardcode table names)
 
 **TDX file collection (cmd/common.go):**
-- All .day/.01/.5 files collected by suffix, filtered only by `^(sh|sz|bj)\d+$` regex
+- All .day/.01 files collected by suffix, filtered only by `^(sh|sz|bj)\d+$` regex
 - No prefix whitelist — full ingest of everything TDX provides
 - Symbol classification via `raw_symbol_class` table (rebuilt after each daily import)
 
@@ -164,14 +164,14 @@ Input: `[]BasicDaily` + `[]GbbqData` → Output: `[]Factor`
 - `TradingCalendar` (calendar.go) 用 raw_holidays + 周末规则识别交易日，下载日线/分时遇到 404 时区分"节假日跳过"/"数据未发布"
 - Tasks defined in `workflow/tasks.go` with explicit `DependsOn`
 - Parallel execution of tasks with no dependencies
-- Optional tasks via `SkipIf` condition (e.g., `--minline`)
+- Optional tasks via `SkipIf` condition (e.g., `--min`)
 - Error modes: `ErrorModeStop` (default) vs `ErrorModeSkip`
 
 **Incremental update logic:**
 - `cron` command 先 `BuildWorkPlan(db, today)` → 全 `Skip` 则直接退出，否则跑 DAG: `update_daily → update_gbbq → calc_basic → calc_factor`，并行 `update_holidays`
 - raw_holidays 为空（首次/旧库）时 plan 强制走全流程，让 holidays 自行写入
 - `calc_basic` 和 `calc_factor` 永远 truncate + 重算（依赖完整历史）
-- 1min/5min 增量导入由 `--minline` 控制（可选任务）
+- 1min 增量导入由 `--min` 控制（可选任务）
 
 **CSV pipeline pattern:**
 - All calculation exports use `utils.Pipeline[I,O]` for concurrent per-symbol processing

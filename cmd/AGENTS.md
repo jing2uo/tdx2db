@@ -57,11 +57,11 @@
 4. Run `GetUpdateTaskNames()` → DAG execution（任务用 plan.NeedXxx 通过 SkipIf 短路）：
    - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
    - `update_holidays` 依赖 `update_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
-   - Optional: `update_1min`, `update_5min` (via --minline)
+   - Optional: `update_1min` (via --min)
 5. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**
-- Types: `day`, `1min`, `5min`, `tic4`, `day4`
+- Types: `day`, `1min`, `tic4`, `day4`
 - Input: directory or zip file
 - Output: CSV files
 - Standalone: no database connection needed
@@ -79,9 +79,6 @@
 - Add command without required flags validation
 
 ## NOTES
-
-**Flag validation:**
-- `--minline` only accepts: `1`, `5`, `1,5`, `5,1`
 
 **Error handling:**
 - Wrap errors with `%w` for error chain

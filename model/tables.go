@@ -125,12 +125,6 @@ var TableKline1Min = SchemaFromStruct(
 	[]string{"symbol", "datetime"},
 )
 
-var TableKline5Min = SchemaFromStruct(
-	"raw_kline_5min",
-	KlineMin{},
-	[]string{"symbol", "datetime"},
-)
-
 var TableSymbolClass = SchemaFromStruct(
 	"raw_symbol_class",
 	SymbolClass{},

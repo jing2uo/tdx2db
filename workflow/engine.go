@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
 
@@ -52,7 +51,7 @@ type Task struct {
 }
 
 type TaskArgs struct {
-	Minline    string
+	Min        bool
 	TempDir    string
 	VipdocDir  string
 	DayFileDir string
@@ -240,30 +239,3 @@ func (te *TaskExecutor) HasTask(name string) bool {
 	return exists
 }
 
-func ParseMinline(minline string) (need1Min, need5Min bool, err error) {
-	if minline == "" {
-		return false, false, nil
-	}
-
-	parts := strings.Split(minline, ",")
-	seen := make(map[string]bool)
-
-	for _, p := range parts {
-		p = strings.TrimSpace(p)
-		if seen[p] {
-			continue
-		}
-		seen[p] = true
-
-		switch p {
-		case "1":
-			need1Min = true
-		case "5":
-			need5Min = true
-		default:
-			return false, false, fmt.Errorf("invalid minline value: %s (expected '1', '5', '1,5')", minline)
-		}
-	}
-
-	return need1Min, need5Min, nil
-}
