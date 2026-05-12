@@ -20,19 +20,15 @@ Database URI:
   DuckDB:     duckdb://[path]`
 
 const dayFileInfo = "通达信日线文件目录"
-const minLineInfo = `导入分时数据（可选）
-  1    导入1分钟分时数据
-  5    导入5分钟分时数据
-  1,5  导入两种`
+const minInfo = "导入 1 分钟分时数据（可选）"
 
 const convertHelp = `
 
 Type & Input:
-  -t day   转换日线文件     -i 包含 .day 的目录
-  -t 1min  转换 1 分钟分时  -i 包含 .1 的目录
-  -t 5min  转换 5 分钟分时  -i 包含 .05 的目录
-  -t tic4  转换四代分笔     -i 四代 TIC 压缩文件
-  -t day4  转换四代日线     -i 四代行情压缩文件`
+  -t day   转换日线文件          -i 包含 .day 的目录
+  -t 1min  转换 1 分钟分时       -i 包含 .1 的目录
+  -t tic4  四代分笔转 1 分钟分时 -i 四代 TIC 压缩文件
+  -t day4  转换四代日线          -i 四代行情压缩文件`
 
 func main() {
 	// 创建可取消的 context
@@ -57,7 +53,7 @@ func main() {
 	var (
 		dbURI      string
 		dayFileDir string
-		minline    string
+		minEnable  bool
 
 		// Convert
 		inputType  string
@@ -78,16 +74,10 @@ func main() {
 	var cronCmd = &cobra.Command{
 		Use:   "cron",
 		Short: "Cron for update data and calc factor",
-		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --minline 1,5
+		Example: `  tdx2db cron --dburi 'clickhouse://localhost' --min
   tdx2db cron --dburi 'duckdb://./tdx.db'` + dbURIHelp,
 		RunE: func(c *cobra.Command, args []string) error {
-			if c.Flags().Changed("minline") {
-				valid := map[string]bool{"1": true, "5": true, "1,5": true, "5,1": true}
-				if !valid[minline] {
-					return fmt.Errorf("--minline 仅支持 '1'、'5'、'1,5', 传入: %s", minline)
-				}
-			}
-			return cmd.Cron(ctx, dbURI, minline)
+			return cmd.Cron(ctx, dbURI, minEnable)
 		},
 	}
 
@@ -107,8 +97,6 @@ func main() {
 				opts.InputType = cmd.DayFileDir
 			case "1min":
 				opts.InputType = cmd.Min1FileDir
-			case "5min":
-				opts.InputType = cmd.Min5FileDir
 			case "tic4":
 				opts.InputType = cmd.TicZip
 			case "day4":
@@ -130,7 +118,7 @@ func main() {
 	// Cron Flags
 	cronCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
 	cronCmd.MarkFlagRequired("dburi")
-	cronCmd.Flags().StringVar(&minline, "minline", "", minLineInfo)
+	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
 
 	// Convert Flags
 	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")

@@ -15,13 +15,12 @@ import (
 )
 
 var (
-	TaskUpdateDaily  *Task
-	TaskInitDaily    *Task
-	TaskUpdateGBBQ   *Task
-	TaskCalcBasic    *Task
-	TaskCalcFactor   *Task
-	TaskUpdate1Min   *Task
-	TaskUpdate5Min   *Task
+	TaskUpdateDaily    *Task
+	TaskInitDaily      *Task
+	TaskUpdateGBBQ     *Task
+	TaskCalcBasic      *Task
+	TaskCalcFactor     *Task
+	TaskUpdate1Min     *Task
 	TaskUpdateHolidays *Task
 )
 
@@ -64,21 +63,9 @@ func init() {
 		Name:      "update_1min",
 		DependsOn: []string{},
 		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
-			need1Min, _, _ := ParseMinline(args.Minline)
-			return !need1Min
+			return !args.Min
 		},
 		Executor: executeUpdate1Min,
-		OnError:  ErrorModeSkip,
-	}
-
-	TaskUpdate5Min = &Task{
-		Name:      "update_5min",
-		DependsOn: []string{},
-		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
-			_, need5Min, _ := ParseMinline(args.Minline)
-			return !need5Min
-		},
-		Executor: executeUpdate5Min,
 		OnError:  ErrorModeSkip,
 	}
 
@@ -235,7 +222,7 @@ func executeCalcFactor(ctx context.Context, db database.DataRepository, args *Ta
 }
 
 func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	latestDate, err := getMinLineLatestDate(db, "1", args)
+	latestDate, err := getMin1LatestDate(db, args)
 	if err != nil {
 		return nil, err
 	}
@@ -270,42 +257,6 @@ func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *Ta
 	return &TaskResult{State: StateSkipped, Message: "no new 1min data"}, nil
 }
 
-func executeUpdate5Min(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	latestDate, err := getMinLineLatestDate(db, "5", args)
-	if err != nil {
-		return nil, err
-	}
-
-	validDates, err := prepareTdxData(ctx, latestDate, "tic", args)
-	if err != nil {
-		return nil, fmt.Errorf("failed to prepare tdx data: %w", err)
-	}
-
-	if len(validDates) >= 30 {
-		return nil, fmt.Errorf("分时数据超过30天未更新，请手动补齐后继续")
-	}
-
-	if len(validDates) > 0 {
-		fmt.Printf("🐌 开始转换5分钟分时数据\n")
-
-		stock5MinCSV := filepath.Join(args.TempDir, "5min.csv")
-
-		_, err := tdx.ConvertFilesToCSV(ctx, args.VipdocDir, stock5MinCSV, ".5")
-		if err != nil {
-			return nil, fmt.Errorf("failed to convert .5 files to csv: %w", err)
-		}
-
-		if err := db.ImportKline5Min(stock5MinCSV); err != nil {
-			return nil, fmt.Errorf("failed to import 5-minute line csv: %w", err)
-		}
-		fmt.Println("📊 5分钟数据导入成功")
-		return &TaskResult{State: StateCompleted, Message: "5min data imported"}, nil
-	}
-
-	fmt.Println("🌲 5分钟分时数据无需更新")
-	return &TaskResult{State: StateSkipped, Message: "no new 5min data"}, nil
-}
-
 func executeUpdateHolidays(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
 	fmt.Printf("🐢 导入通达信交易日历\n")
 	zhbZipPath := filepath.Join(args.TempDir, "gbbq-temp", "zhb.zip")
@@ -322,26 +273,19 @@ func executeUpdateHolidays(ctx context.Context, db database.DataRepository, args
 	return &TaskResult{State: StateCompleted, Message: "holidays data imported"}, nil
 }
 
-func getMinLineLatestDate(db database.DataRepository, minline string, args *TaskArgs) (time.Time, error) {
-	var tableName string
-	if minline == "1" {
-		tableName = model.TableKline1Min.TableName
-	} else {
-		tableName = model.TableKline5Min.TableName
-	}
-
-	latestDate, err := db.GetLatestDate(tableName, "datetime")
+func getMin1LatestDate(db database.DataRepository, args *TaskArgs) (time.Time, error) {
+	latestDate, err := db.GetLatestDate(model.TableKline1Min.TableName, "datetime")
 	if err != nil {
 		return time.Time{}, err
 	}
 
 	if latestDate.IsZero() {
-		fmt.Printf("🛑 警告：数据库中没有 %s分钟 数据\n", minline)
+		fmt.Println("🛑 警告：数据库中没有 1分钟 数据")
 		fmt.Println("🚧 将处理今天的数据，历史请自行导入")
 		return args.Today.AddDate(0, 0, -1), nil
 	}
 
-	fmt.Printf("📅 %s分钟数据最新日期为 %s\n", minline, latestDate.Format("2006-01-02"))
+	fmt.Printf("📅 1分钟数据最新日期为 %s\n", latestDate.Format("2006-01-02"))
 	return latestDate, nil
 }
 
@@ -478,7 +422,6 @@ func GetUpdateTaskNames() []string {
 		"calc_basic",
 		"calc_factor",
 		"update_1min",
-		"update_5min",
 		"update_holidays",
 	}
 }
@@ -491,7 +434,6 @@ func GetRegisteredTasks() map[string]*Task {
 		"calc_basic":      TaskCalcBasic,
 		"calc_factor":     TaskCalcFactor,
 		"update_1min":     TaskUpdate1Min,
-		"update_5min":     TaskUpdate5Min,
 		"update_holidays": TaskUpdateHolidays,
 	}
 }

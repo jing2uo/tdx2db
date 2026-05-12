@@ -46,8 +46,7 @@ TaskUpdate1Min = &Task{
     Name:      "update_1min",
     DependsOn: []string{},
     SkipIf: func(ctx, db, args) bool {
-        need1Min, _, _ := ParseMinline(args.Minline)
-        return !need1Min
+        return !args.Min
     },
     Executor: executeUpdate1Min,
     OnError: ErrorModeSkip,
@@ -71,7 +70,7 @@ TaskCalcBasic = &Task{
 - `executeInitDaily()` - Uses user-provided directory, then calls `executeDailyImport()`
 
 **TaskArgs:**
-- `Minline` - "1", "5", "1,5"
+- `Min` - bool, 设为 true 时 cron 会跑 update_1min
 - `TempDir`, `VipdocDir` - Temp directories
 - `DayFileDir` - User-provided TDX data directory (for init)
 - `Today` - Current date for incremental updates
@@ -97,17 +96,17 @@ TaskCalcBasic = &Task{
 ## NOTES
 
 **Task chains:**
-- Update mode: `update_daily → update_gbbq → calc_basic → calc_factor → update_1min → update_5min → update_holidays`
+- Update mode: `update_daily → update_gbbq → calc_basic → calc_factor → update_1min → update_holidays`
 - Init mode: `init_daily` (only import daily data from user-provided directory)
 
 **calc_basic and calc_factor run in full recalculation mode** — they truncate the target table and reimport all rows. This is intentional because preclose/factor depend on the entire history chain.
 
 **Error modes:**
 - `ErrorModeStop` - Stop execution on error (default)
-- `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_5min, update_holidays)
+- `ErrorModeSkip` - Continue execution even if task fails (for optional tasks like update_1min, update_holidays)
 
 **Task skipping:**
-- Tasks can be skipped by `SkipIf` condition (e.g., minline not set)
+- Tasks can be skipped by `SkipIf` condition (e.g., --min not set)
 - Tasks can also return `StateSkipped` when no new data exists (e.g., non-trading day, data already up to date)
 
 **Usage from cmd/init.go:**
@@ -131,7 +130,7 @@ if !plan.AnyNeeded() {
 }
 executor := workflow.NewTaskExecutor(db, workflow.GetRegisteredTasks())
 args := &workflow.TaskArgs{
-    Minline:   minline,
+    Min:       minEnable,
     TempDir:   TempDir,
     VipdocDir: VipdocDir,
     Today:     GetToday(),

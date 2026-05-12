@@ -9,7 +9,7 @@ import (
 	"github.com/jing2uo/tdx2db/model"
 )
 
-func (d *DuckDBDriver) importCSV(meta *model.TableMeta, csvPath string) error {
+func (d *DuckDBDriver) ImportCSV(meta *model.TableMeta, csvPath string) error {
 	var colMaps []string
 	for _, col := range meta.Columns {
 		duckType := d.mapType(col.Type)
@@ -45,33 +45,29 @@ func (d *DuckDBDriver) TruncateTable(meta *model.TableMeta) error {
 }
 
 func (d *DuckDBDriver) ImportKlineDaily(path string) error {
-	return d.importCSV(model.TableKlineDaily, path)
+	return d.ImportCSV(model.TableKlineDaily, path)
 }
 
 func (d *DuckDBDriver) ImportKline1Min(path string) error {
-	return d.importCSV(model.TableKline1Min, path)
-}
-
-func (d *DuckDBDriver) ImportKline5Min(path string) error {
-	return d.importCSV(model.TableKline5Min, path)
+	return d.ImportCSV(model.TableKline1Min, path)
 }
 
 func (d *DuckDBDriver) ImportGBBQ(path string) error {
 	d.TruncateTable(model.TableGbbq)
-	return d.importCSV(model.TableGbbq, path)
+	return d.ImportCSV(model.TableGbbq, path)
 }
 
 func (d *DuckDBDriver) ImportBasic(path string) error {
-	return d.importCSV(model.TableBasicDaily, path)
+	return d.ImportCSV(model.TableBasicDaily, path)
 }
 
 func (d *DuckDBDriver) ImportAdjustFactors(path string) error {
-	return d.importCSV(model.TableAdjustFactor, path)
+	return d.ImportCSV(model.TableAdjustFactor, path)
 }
 
 func (d *DuckDBDriver) ImportHolidays(path string) error {
 	d.TruncateTable(model.TableHoliday)
-	return d.importCSV(model.TableHoliday, path)
+	return d.ImportCSV(model.TableHoliday, path)
 }
 
 func (d *DuckDBDriver) Query(table string, conditions map[string]interface{}, dest interface{}) error {

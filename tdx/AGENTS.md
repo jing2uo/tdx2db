@@ -1,11 +1,11 @@
 # TDX DATA PARSING
 
-**Purpose:** Parse 通达信(TDX) binary format files (.day, .01, .5) 与假期日历
+**Purpose:** Parse 通达信(TDX) binary format files (.day, .01) 与假期日历
 
 ## STRUCTURE
 ```
 ./tdx/
-├── kline.go       # K-line parsing (.day, .1, .5)
+├── kline.go       # K-line parsing (.day, .01)
 ├── kline_test.go
 ├── merge.go       # native day merge (跨平台合并 vipdoc 输出)
 ├── merge_test.go
@@ -62,7 +62,6 @@
 **File suffixes:**
 - `.day` - Daily K-line data
 - `.01` - 1-minute K-line
-- `.5` - 5-minute K-line
 
 **Symbol extraction:**
 - Symbol = filename without suffix (e.g., `sh000001.day` → `sh000001`)

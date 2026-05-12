@@ -15,9 +15,9 @@ type DataRepository interface {
 	ReadSchemaVersion() (string, error)
 	WriteSchemaVersion() error
 
+	ImportCSV(meta *model.TableMeta, csvPath string) error
 	ImportKlineDaily(csvPath string) error
 	ImportKline1Min(csvPath string) error
-	ImportKline5Min(csvPath string) error
 	ImportAdjustFactors(csvPath string) error
 	ImportGBBQ(csvPath string) error
 	ImportBasic(csvPath string) error

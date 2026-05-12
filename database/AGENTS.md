@@ -75,7 +75,7 @@
 ## NOTES
 
 **Table naming:**
-- `raw_*` - Imported data tables (raw_kline_daily, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_kline_1min, raw_kline_5min)
+- `raw_*` - Imported data tables (raw_kline_daily, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_kline_1min)
 - `v_*` - Views (v_bfq_daily, v_qfq_daily, v_hfq_daily) - join `raw_symbol_class` 过滤 `class IN ('stock','etf')`
 - `_meta` - Schema version and metadata (key/value)
 - Tables auto-registered via `model.SchemaFromStruct()`, views via `model.DefineView()`

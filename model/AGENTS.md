@@ -24,7 +24,7 @@
 | Struct | Table | Description |
 |--------|-------|-------------|
 | KlineDay | raw_kline_daily | Raw OHLCV + date |
-| KlineMin | raw_kline_1min / raw_kline_5min | Minute OHLCV + datetime |
+| KlineMin | raw_kline_1min | Minute OHLCV + datetime |
 | SymbolClass | raw_symbol_class | Symbol → class mapping (stock/index/etf/block/unknown) |
 | BasicDaily | raw_basic_daily | Calculated: preclose, change_pct, amplitude, turnover, floatmv, totalmv (覆盖 stock + ETF) |
 | Factor | raw_adjust_factor | HFQ factor per symbol per date |
