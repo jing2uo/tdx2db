@@ -239,3 +239,37 @@ func (te *TaskExecutor) HasTask(name string) bool {
 	return exists
 }
 
+var (
+	registeredTasks = map[string]*Task{}
+	updateTaskNames []string
+	initTaskNames   []string
+)
+
+// registerTask 把 task 加入全局注册表，并按组（"update" / "init"）追加任务名清单。
+// 各 task_*.go 在自己的 init() 里调用本函数完成自注册。
+func registerTask(t *Task, groups ...string) {
+	registeredTasks[t.Name] = t
+	for _, g := range groups {
+		switch g {
+		case "update":
+			updateTaskNames = append(updateTaskNames, t.Name)
+		case "init":
+			initTaskNames = append(initTaskNames, t.Name)
+		}
+	}
+}
+
+func GetRegisteredTasks() map[string]*Task { return registeredTasks }
+func GetUpdateTaskNames() []string         { return updateTaskNames }
+func GetInitTaskNames() []string           { return initTaskNames }
+
+// skipIfPlan 仅在 Plan 存在且谓词判为 true 时跳过；Plan 为 nil（如 init 流程）时保持原行为。
+func skipIfPlan(predicate func(*WorkPlan) bool) SkipCondition {
+	return func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
+		if args.Plan == nil {
+			return false
+		}
+		return predicate(args.Plan)
+	}
+}
+
