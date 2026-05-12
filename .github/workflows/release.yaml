@@ -71,7 +71,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          VERSION="${GITHUB_REF_NAME}"
           DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           go build \
             -ldflags="-s -w -X main.version=${VERSION} -X main.commit=${GITHUB_SHA} -X main.date=${DATE}" \

@@ -5,12 +5,47 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"syscall"
 
 	"github.com/jing2uo/tdx2db/cmd"
 	"github.com/spf13/cobra"
 )
+
+// 由 ldflags 注入（见 .github/workflows/release.yaml）；
+// 未注入时（裸 go build）从 runtime/debug 读 VCS 信息。
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
+
+func buildVersionString() string {
+	v, c, d := version, commit, date
+	var dirty bool
+	if v == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok {
+			for _, s := range info.Settings {
+				switch s.Key {
+				case "vcs.revision":
+					c = s.Value
+				case "vcs.time":
+					d = s.Value
+				case "vcs.modified":
+					dirty = s.Value == "true"
+				}
+			}
+		}
+	}
+	if len(c) > 7 {
+		c = c[:7]
+	}
+	if dirty {
+		c += " (dirty)"
+	}
+	return fmt.Sprintf("tdx2db %s\ncommit: %s\nbuilt:  %s", v, c, d)
+}
 
 const dbURIInfo = "数据库连接信息"
 const dbURIHelp = `
@@ -44,10 +79,23 @@ func main() {
 		cancel()
 	}()
 
+	versionStr := buildVersionString()
 	var rootCmd = &cobra.Command{
 		Use:           "tdx2db",
 		Short:         "Load TDX Data to DuckDB",
 		SilenceErrors: true,
+		Version:       versionStr,
+	}
+	// 预注册 -v 短选项；cobra 默认只挂 --version
+	rootCmd.Flags().BoolP("version", "v", false, "version for tdx2db")
+	rootCmd.SetVersionTemplate("{{.Version}}\n")
+
+	var versionCmd = &cobra.Command{
+		Use:   "version",
+		Short: "Print version information",
+		Run: func(c *cobra.Command, args []string) {
+			fmt.Println(versionStr)
+		},
 	}
 
 	var (
@@ -131,6 +179,7 @@ func main() {
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(cronCmd)
 	rootCmd.AddCommand(convertCmd)
+	rootCmd.AddCommand(versionCmd)
 
 	cobra.OnFinalize(func() {
 		os.RemoveAll(cmd.TempDir)

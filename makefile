@@ -8,13 +8,19 @@ BIN_NAME      := tdx2db
 INSTALL_DIR   := /usr/local/bin
 LOCAL_BIN     := $(HOME)/.local/bin
 
+# Version info — git tag (例: v4.0-2-g09a5c9d-dirty) / 完整 SHA / UTC 时间
+VERSION       := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT        := $(shell git rev-parse HEAD 2>/dev/null || echo none)
+DATE          := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+LDFLAGS       := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+
 .PHONY: all build check-unrar download extract move_datatool clean sudo-install user-install
 
 all: build
 
 build: check-unrar download extract move_datatool clean-tmp
-	@echo "Building Go binary..."
-	go build -o $(BIN_NAME)
+	@echo "Building Go binary $(VERSION)..."
+	go build -ldflags="$(LDFLAGS)" -o $(BIN_NAME) .
 
 prepare: check-unrar download extract move_datatool
 	@echo "Prepare datatool..."
