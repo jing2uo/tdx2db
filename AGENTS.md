@@ -1,12 +1,12 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-05-02
+**Updated:** 2026-05-13
 **Branch:** main
 
 ## OVERVIEW
 通达信(TDX) stock data importer — loads .day/.01/.5 files to DuckDB/ClickHouse, calculates preclose/turnover/market-value (basic), and 后复权因子 (hfq_factor). basic/factor 链路覆盖 stock + ETF (含 LOF/老封基/B股)。
 
-Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_meta` table stores the schema version; init/cron check major version compatibility at startup.
+Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_meta` table stores the schema version; init/cron check major version compatibility at startup.
 
 ## STRUCTURE
 ```
@@ -68,7 +68,7 @@ Current schema version: **v3.0** (`model.SchemaMajor=3, SchemaMinor=0`). The `_m
 
 **Table naming:**
 - `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays)
-- `v_*` — views (v_bfq_daily, v_qfq_daily, v_hfq_daily) — 通过 `raw_symbol_class` 过滤，仅保留 stock + etf
+- `v_*` — views，按 (class, fq) 拆成 6 个：v_{stock,etf}_{bfq,qfq,hfq}；stock 价格 ROUND 2 位，ETF 3 位
 - `_meta` — schema version metadata (key/value store)
 
 **Table registration:**
