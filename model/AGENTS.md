@@ -49,8 +49,7 @@
 **View registration (views.go):**
 - `DefineView()` registers view ID into global `viewRegistry`
 - View SQL is driver-specific (implemented in database/*/ddl.go)
-- Three views: v_bfq_daily (不复权), v_qfq_daily (前复权), v_hfq_daily (后复权)
-- 视图通过 join `raw_symbol_class` 过滤 `class IN ('stock','etf')`
+- 6 视图：v_{stock,etf}_{bfq,qfq,hfq} —— 各自 INNER JOIN `raw_symbol_class` 过滤单一 class，stock 价 ROUND 2 位 / etf 3 位
 
 **Classification helpers (classify.go):**
 - `ClassifyCode(symbol)` → stock/index/etf/block/unknown，按 (market, prefix) 最长前缀匹配

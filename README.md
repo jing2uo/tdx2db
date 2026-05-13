@@ -146,18 +146,21 @@ raw\_ 前缀的表名用于存储基础数据，v\_ 前缀的表名是视图。
 | `raw_kline_daily`       | 日线数据 (股票/指数/ETF/板块) |
 | `raw_basic_daily`       | 股票/ETF 前收盘价、换手率与市值 |
 | `raw_symbol_class`      | 品种分类 (stock/index/etf/等) |
-| `v_bfq_daily`           | 不复权日线，包含 basic_daily  |
-| `v_qfq_daily`           | 前复权日线数据                |
-| `v_hfq_daily`           | 后复权日线数据                |
+| `v_stock_bfq`           | 股票不复权日线                |
+| `v_stock_qfq`           | 股票前复权日线                |
+| `v_stock_hfq`           | 股票后复权日线                |
+| `v_etf_bfq`             | ETF 不复权日线                |
+| `v_etf_qfq`             | ETF 前复权日线                |
+| `v_etf_hfq`             | ETF 后复权日线                |
 
-复权数据，默认创建日线前后复权视图，如需分时参考 v_qfq_daily 调整即可：
+视图按 `v_<class>_<fq>` 命名，class 放前面便于 tab-complete 按归属浏览。股票价格精度 2 位、ETF 3 位，由各自视图直接 ROUND。
 
 ```sql
-# 前复权
-select * from v_qfq_daily where symbol='sz000001' order by date;
+# 股票前复权
+select * from v_stock_qfq where symbol='sz000001' order by date;
 
-# 后复权
-select * from v_hfq_daily where symbol='sz000001' order by date;
+# ETF 后复权
+select * from v_etf_hfq where symbol='sh510300' order by date;
 ```
 
 复权算法来自 QUANTAXIS，原理参考：[点击查看](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L)，复权结果和 QUANTAXIS、通达信等比复权一致；其中前复权结果和雪球、新浪也一致。

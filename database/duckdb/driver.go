@@ -97,27 +97,3 @@ func (d *DuckDBDriver) Connect() error {
 func (d *DuckDBDriver) Close() error {
 	return d.db.Close()
 }
-
-func (d *DuckDBDriver) InitSchema() error {
-	tables := model.AllTables()
-
-	for _, t := range tables {
-		if err := d.createTableInternal(t); err != nil {
-			return fmt.Errorf("failed to create table %s: %w", t.TableName, err)
-		}
-	}
-	d.registerViews()
-	for _, viewID := range model.AllViews() {
-
-		implFunc, exists := d.viewImpls[viewID]
-		if !exists {
-			return fmt.Errorf("[DuckDB] Missing implementation for required view: %s", viewID)
-		}
-
-		if err := implFunc(); err != nil {
-			return fmt.Errorf("failed to create view %s: %w", viewID, err)
-		}
-	}
-
-	return nil
-}
