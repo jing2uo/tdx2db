@@ -24,6 +24,7 @@ type DataRepository interface {
 	ImportHolidays(csvPath string) error
 	ImportBlockInfo(csvPath string) error
 	ImportBlockMembers(csvPath string) error
+	ImportSymbolNames(csvPath string) error
 
 	TruncateTable(meta *model.TableMeta) error
 	Query(table string, conditions map[string]interface{}, dest interface{}) error

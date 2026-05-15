@@ -166,3 +166,9 @@ var TableBlockMember = SchemaFromStruct(
 	BlockMember{},
 	[]string{"block_code", "stock_symbol"},
 )
+
+var TableSymbolName = SchemaFromStruct(
+	"raw_symbol_name",
+	SymbolName{},
+	[]string{"symbol"},
+)

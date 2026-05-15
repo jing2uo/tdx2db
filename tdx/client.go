@@ -23,6 +23,20 @@ var macHosts = []struct {
 	{"行情主站3", "121.37.207.165", "7709"},
 }
 
+var standardHosts = []struct {
+	Name string
+	Addr string
+	Port string
+}{
+	{"通达信深圳双线主站1", "110.41.147.114", "7709"},
+	{"通达信深圳双线主站2", "110.41.2.72", "7709"},
+	{"通达信深圳双线主站3", "110.41.4.4", "7709"},
+	{"通达信深圳双线主站4", "47.113.94.204", "7709"},
+	{"通达信上海双线主站1", "124.70.176.52", "7709"},
+	{"通达信上海双线主站2", "47.100.236.28", "7709"},
+	{"通达信北京双线主站1", "121.36.54.217", "7709"},
+}
+
 type OnlineClient struct {
 	conn net.Conn
 }
@@ -32,6 +46,18 @@ func NewOnlineClient() *OnlineClient {
 }
 
 func (c *OnlineClient) Connect() error {
+	return c.connectToHosts(macHosts)
+}
+
+func (c *OnlineClient) ConnectStandard() error {
+	return c.connectToHosts(standardHosts)
+}
+
+func (c *OnlineClient) connectToHosts(hosts []struct {
+	Name string
+	Addr string
+	Port string
+}) error {
 	if c.conn != nil {
 		return nil
 	}
@@ -41,7 +67,7 @@ func (c *OnlineClient) Connect() error {
 		dur  time.Duration
 	}
 	var candidates []candidate
-	for _, h := range macHosts {
+	for _, h := range hosts {
 		addr := net.JoinHostPort(h.Addr, h.Port)
 		start := time.Now()
 		conn, err := net.DialTimeout("tcp", addr, time.Second)
@@ -74,6 +100,10 @@ func (c *OnlineClient) Close() error {
 }
 
 func (c *OnlineClient) Call(msgID uint16, body []byte) ([]byte, error) {
+	return c.CallWithHead(1, msgID, body)
+}
+
+func (c *OnlineClient) CallWithHead(head byte, msgID uint16, body []byte) ([]byte, error) {
 	if c.conn == nil {
 		return nil, fmt.Errorf("TDX online client is not connected")
 	}
@@ -83,7 +113,7 @@ func (c *OnlineClient) Call(msgID uint16, body []byte) ([]byte, error) {
 	copy(payload[2:], body)
 
 	packet := make([]byte, 10+len(payload))
-	packet[0] = 1
+	packet[0] = head
 	// customize uint32 at [1:5] remains 0, compatible with synchronous calls.
 	packet[5] = 1
 	binary.LittleEndian.PutUint16(packet[6:8], uint16(len(payload)))

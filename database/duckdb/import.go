@@ -74,6 +74,11 @@ func (d *DuckDBDriver) ImportBlockMembers(path string) error {
 	return d.ImportCSV(model.TableBlockMember, path)
 }
 
+func (d *DuckDBDriver) ImportSymbolNames(path string) error {
+	d.TruncateTable(model.TableSymbolName)
+	return d.ImportCSV(model.TableSymbolName, path)
+}
+
 // RebuildSymbolClass 全量重建 symbol_class 表（从 raw_kline_daily 取 distinct symbol 后归类）。
 // 写入逻辑跟 Import 系列同性质，放这里。
 func (d *DuckDBDriver) RebuildSymbolClass() error {
