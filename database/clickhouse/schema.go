@@ -51,7 +51,12 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 
 	// 2. 确定排序键 (MergeTree 必须)
 	orderBy := "tuple()"
-	if keyCol != "" && dateCol != "" {
+	if keys := cleanOrderByKey(meta.OrderByKey); len(keys) > 0 {
+		orderBy = strings.Join(keys, ", ")
+		if len(keys) > 1 {
+			orderBy = fmt.Sprintf("(%s)", orderBy)
+		}
+	} else if keyCol != "" && dateCol != "" {
 		orderBy = fmt.Sprintf("(%s, %s)", keyCol, dateCol)
 	} else if dateCol != "" {
 		orderBy = dateCol
@@ -69,6 +74,17 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 
 	_, err := d.db.Exec(query)
 	return err
+}
+
+func cleanOrderByKey(keys []string) []string {
+	result := make([]string, 0, len(keys))
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key != "" {
+			result = append(result, key)
+		}
+	}
+	return result
 }
 
 // InitSchema 创建所有表 + 视图。

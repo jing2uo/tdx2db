@@ -22,6 +22,8 @@ type DataRepository interface {
 	ImportGBBQ(csvPath string) error
 	ImportBasic(csvPath string) error
 	ImportHolidays(csvPath string) error
+	ImportBlockInfo(csvPath string) error
+	ImportBlockMembers(csvPath string) error
 
 	TruncateTable(meta *model.TableMeta) error
 	Query(table string, conditions map[string]interface{}, dest interface{}) error
