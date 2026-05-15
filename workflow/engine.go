@@ -3,6 +3,7 @@ package workflow
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jing2uo/tdx2db/database"
@@ -166,6 +167,11 @@ func (te *TaskExecutor) Run(ctx context.Context, taskNames []string, args *TaskA
 					}
 					return fmt.Errorf("task %s failed: %w", completed.name, completed.result.Error)
 				}
+				// ErrorModeSkip: 不阻塞流程, 但必须把 error 透出来,
+				// 否则失败的任务在日志里完全无痕, 整体 return nil
+				// 用户看到"今日任务执行成功"很容易误判。
+				fmt.Fprintf(os.Stderr, "💢 任务 %s 失败但已跳过: %v\n",
+					completed.name, completed.result.Error)
 			}
 		}
 	}
