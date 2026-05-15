@@ -90,8 +90,8 @@ func describePlan(plan *WorkPlan, dailyLatest time.Time) string {
 	cal := plan.Calendar
 
 	if plan.NeedDaily {
-		return fmt.Sprintf("📅 数据库日线最新 %s，落后于最近交易日 %s，执行更新",
-			dailyLatest.Format("2006-01-02"), plan.LastTradingDay.Format("2006-01-02"))
+		return fmt.Sprintf("📅 数据库日线最新 %s，执行更新",
+			dailyLatest.Format("2006-01-02"))
 	}
 
 	if plan.NeedBasic || plan.NeedFactor {

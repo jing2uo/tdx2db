@@ -23,7 +23,7 @@ func init() {
 }
 
 func executeUpdateSymbolNames(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	fmt.Println("🧩 开始拉取通达信在线品种名称")
+	fmt.Println("🧩 开始下载代码名称")
 
 	names, err := tdx.FetchOnlineSymbolNames(ctx)
 	if err != nil {
@@ -46,6 +46,6 @@ func executeUpdateSymbolNames(ctx context.Context, db database.DataRepository, a
 	}
 
 	msg := fmt.Sprintf("symbol names imported: %d rows", len(names))
-	fmt.Printf("🚀 品种名称导入成功: %d 条记录\n", len(names))
+	fmt.Printf("🚀 代码名称导入成功\n")
 	return &TaskResult{State: StateCompleted, Rows: len(names), Message: msg}, nil
 }

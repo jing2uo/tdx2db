@@ -23,7 +23,7 @@ func init() {
 }
 
 func executeUpdateBlocks(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	fmt.Println("🧩 开始拉取通达信在线板块数据")
+	fmt.Println("🧩 开始下载板块数据")
 
 	blockInfos, blockMembers, err := tdx.FetchOnlineBlocks(ctx)
 	if err != nil {
@@ -60,6 +60,6 @@ func executeUpdateBlocks(ctx context.Context, db database.DataRepository, args *
 	}
 
 	msg := fmt.Sprintf("blocks imported: %d info rows, %d member rows", len(blockInfos), len(blockMembers))
-	fmt.Printf("🚀 板块数据导入成功: %d 个板块, %d 条成分关系\n", len(blockInfos), len(blockMembers))
+	fmt.Printf("🚀 板块数据导入成功\n")
 	return &TaskResult{State: StateCompleted, Rows: len(blockInfos) + len(blockMembers), Message: msg}, nil
 }
