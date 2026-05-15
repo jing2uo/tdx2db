@@ -1,6 +1,6 @@
 # TDX DATA PARSING
 
-**Purpose:** Parse 通达信(TDX) binary format files (.day, .01) 与假期日历
+**Purpose:** Parse 通达信(TDX) binary format files (.day, .01), 假期日历, and online OpenTDX quote/block data
 
 ## STRUCTURE
 ```
@@ -11,6 +11,9 @@
 ├── merge_test.go
 ├── gbbq.go        # 股本变迁 parsing
 ├── holidays.go    # 交易日历解析 (zhb.zip → needini.dat)
+├── client.go      # OpenTDX protocol client/session helpers
+├── block.go       # 在线板块/行业/概念信息 + 成分关系拉取
+├── stock.go       # 在线代码名称拉取 (quote server 0x44d)
 ├── gbbq_var.go    # TDX datatool variable definitions
 ├── datatool.go    # Embedded datatool interface (Linux only)
 └── embed/         # Embedded TDX datatool binary
@@ -22,6 +25,9 @@
 | Add new K-line format | kline.go | Follow 32-byte record pattern |
 | Parse holidays | holidays.go | needini.dat 文本解析 |
 | Modify gbbq parsing | gbbq.go | Uses embedded datatool |
+| Modify online block data | block.go | OpenTDX protocol block/category/member requests |
+| Modify online code names | stock.go | TDX quote server 0x44d interface |
+| Modify OpenTDX session/protocol | client.go | Connection, request/response framing |
 | TDX binary format | All files | Little-endian byte order |
 
 ## CONVENTIONS
@@ -44,6 +50,11 @@
 - `ConvertFilesToCSV()` uses `utils.Pipeline` for concurrent file processing
 - Files filtered by `^(sh|sz|bj)\d+$` regex — full ingest, no prefix whitelist
 - Context cancellation checked in loops
+
+**Online data:**
+- `FetchOnlineBlocks(ctx)` returns `[]model.BlockInfo` + `[]model.BlockMember` for block/industry/concept imports
+- `FetchOnlineSymbolNames(ctx)` returns `[]model.SymbolName` for online code-name imports, filtering stock / etf / index classes
+- These online fetchers are update-time helpers; raw daily ingestion and basic/factor calculations still use parsed K-line files + `raw_symbol_class`
 
 ## ANTI-PATTERNS
 

@@ -41,7 +41,7 @@
 - `Connect()/Close()` - Lifecycle management
 - `InitSchema()` - Create tables + views (auto-registered via model package)
 - `ReadSchemaVersion()/WriteSchemaVersion()` - _meta table schema version read/write (no judgment logic)
-- `Import*()` - CSV import: KlineDaily, Kline1Min, Kline5Min, AdjustFactors, GBBQ, Basic, Holidays
+- `Import*()` - CSV import: KlineDaily, Kline1Min, AdjustFactors, GBBQ, Basic, Holidays, BlockInfo, BlockMembers, SymbolNames
 - `TruncateTable(meta)` - Clear table (used by full-recalc tasks)
 - `Query()` - Generic query with conditions map
 - `QueryKlineDaily()` - Date range filtered OHLCV data
@@ -81,7 +81,7 @@
 ## NOTES
 
 **Table naming:**
-- `raw_*` - Imported data tables (raw_kline_daily, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_kline_1min)
+- `raw_*` - Imported data tables (raw_kline_daily, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_kline_1min, raw_tdx_blocks_info, raw_tdx_blocks_member, raw_symbol_name)
 - `v_*` - Views: v_{stock,etf}_{bfq,qfq,hfq} 6 个视图，按 class 过滤、stock 价格 ROUND 2 位 / etf 3 位
 - `_meta` - Schema version and metadata (key/value)
 - Tables auto-registered via `model.SchemaFromStruct()`, views via `model.DefineView()`

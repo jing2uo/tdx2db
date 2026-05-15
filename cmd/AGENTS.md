@@ -19,8 +19,8 @@
 | Modify flags | main.go | Add flags to command |
 | Change symbol collection | model/classify.go | ClassifyCode + RebuildSymbolClass |
 | Schema version check | schema_version.go | writeSchemaVersion / checkSchemaVersion |
-| Modify cron logic | workflow/tasks.go | Task executor functions |
-| Run specific tasks | workflow/task.go | Use TaskExecutor directly |
+| Modify cron logic | workflow/task_*.go + workflow/plan.go | Task executor functions and WorkPlan gating |
+| Run specific tasks | workflow/engine.go | Use TaskExecutor directly |
 
 ## CONVENTIONS
 
@@ -32,7 +32,7 @@
 
 **Temp directory:**
 - Created via `utils.GetCacheDir()` → `$TMPDIR/tdx2db-temp-*`
-- CSV paths constructed in `workflow/tasks.go` using `filepath.Join(TempDir, "stock.csv")`
+- CSV paths constructed in `workflow/task_*.go` using `filepath.Join(TempDir, "...")`
 - Cleaned up by `cobra.OnFinalize`
 
 **Common (common.go):**
@@ -55,9 +55,10 @@
 2. `checkSchemaVersion()` — reject if version missing or incompatible
 3. `workflow.BuildWorkPlan(db, today)` — 读 raw_holidays + 各表最新日期，决定哪些任务要跑；全 Skip 则直接退出 (打印 plan.Reason)
 4. Run `GetUpdateTaskNames()` → DAG execution（任务用 plan.NeedXxx 通过 SkipIf 短路）：
-   - `update_daily` → `update_gbbq` → `calc_basic` → `calc_factor`
-   - `update_holidays` 依赖 `update_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
-   - Optional: `update_1min` (via --min)
+   - `update_daily + fetch_gbbq` → `update_gbbq` → `calc_basic` → `calc_factor`
+   - `update_holidays` 依赖 `fetch_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
+   - Independent online tasks: `update_blocks`, `update_symbol_names`
+   - Optional: `fetch_tick` → `update_1min` (via --min)
 5. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 **convert command:**

@@ -98,6 +98,27 @@ func (d *ClickHouseDriver) ImportHolidays(path string) error {
 	return d.ImportCSV(model.TableHoliday, path)
 }
 
+func (d *ClickHouseDriver) ImportBlockInfo(path string) error {
+	if err := d.TruncateTable(model.TableBlockInfo); err != nil {
+		return err
+	}
+	return d.ImportCSV(model.TableBlockInfo, path)
+}
+
+func (d *ClickHouseDriver) ImportBlockMembers(path string) error {
+	if err := d.TruncateTable(model.TableBlockMember); err != nil {
+		return err
+	}
+	return d.ImportCSV(model.TableBlockMember, path)
+}
+
+func (d *ClickHouseDriver) ImportSymbolNames(path string) error {
+	if err := d.TruncateTable(model.TableSymbolName); err != nil {
+		return err
+	}
+	return d.ImportCSV(model.TableSymbolName, path)
+}
+
 // RebuildSymbolClass 全量重建 symbol_class 表（从 raw_kline_daily 取 distinct symbol 后归类）。
 // 写入逻辑跟 Import 系列同性质，放这里。
 func (d *ClickHouseDriver) RebuildSymbolClass() error {

@@ -3,7 +3,6 @@ package workflow
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/jing2uo/tdx2db/database"
@@ -84,25 +83,39 @@ func (te *TaskExecutor) Run(ctx context.Context, taskNames []string, args *TaskA
 		return fmt.Errorf("failed to resolve task dependencies: %w", err)
 	}
 
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	taskSet := make(map[string]bool)
+	for _, name := range order {
+		taskSet[name] = true
+	}
+
+	type taskRunResult struct {
+		name   string
+		result *TaskResult
+	}
+
 	results := make(map[string]*TaskResult)
 	pending := make(map[string]bool)
 	for _, name := range order {
 		pending[name] = true
 	}
+	running := map[string]bool{}
+	resultCh := make(chan taskRunResult, len(order))
 
-	for len(pending) > 0 {
+	for len(pending) > 0 || len(running) > 0 {
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-runCtx.Done():
+			for len(running) > 0 {
+				left := <-resultCh
+				delete(running, left.name)
+			}
+			return runCtx.Err()
 		default:
 		}
 
-		ready := te.findReadyTasks(pending, results)
-		if len(ready) == 0 {
-			return fmt.Errorf("circular dependency detected or no ready tasks")
-		}
-
-		var wg sync.WaitGroup
+		ready := te.findReadyTasks(pending, results, taskSet)
 		for _, name := range ready {
 			task, exists := te.tasks[name]
 			if !exists {
@@ -110,30 +123,50 @@ func (te *TaskExecutor) Run(ctx context.Context, taskNames []string, args *TaskA
 				continue
 			}
 
-			if task.SkipIf != nil && task.SkipIf(ctx, te.db, args) {
+			if task.SkipIf != nil && task.SkipIf(runCtx, te.db, args) {
 				results[name] = &TaskResult{State: StateSkipped, Message: "skipped by condition"}
 				delete(pending, name)
 				continue
 			}
 
-			wg.Add(1)
+			delete(pending, name)
+			running[name] = true
 			go func(n string, t *Task) {
-				defer wg.Done()
-				results[n] = te.executeTask(ctx, t, args)
+				resultCh <- taskRunResult{name: n, result: te.executeTask(runCtx, t, args)}
 			}(name, task)
 		}
 
-		wg.Wait()
+		if len(pending) == 0 && len(running) == 0 {
+			break
+		}
+		if len(ready) == 0 && len(running) == 0 {
+			return fmt.Errorf("circular dependency detected or no ready tasks")
+		}
+		if len(running) == 0 {
+			continue
+		}
 
-		for _, name := range ready {
-			result := results[name]
-			if result.Error != nil {
-				task := te.tasks[name]
+		select {
+		case <-runCtx.Done():
+			for len(running) > 0 {
+				left := <-resultCh
+				delete(running, left.name)
+			}
+			return runCtx.Err()
+		case completed := <-resultCh:
+			delete(running, completed.name)
+			results[completed.name] = completed.result
+			if completed.result.Error != nil {
+				task := te.tasks[completed.name]
 				if task.OnError == ErrorModeStop {
-					return fmt.Errorf("task %s failed: %w", name, result.Error)
+					cancel()
+					for len(running) > 0 {
+						left := <-resultCh
+						delete(running, left.name)
+					}
+					return fmt.Errorf("task %s failed: %w", completed.name, completed.result.Error)
 				}
 			}
-			delete(pending, name)
 		}
 	}
 
@@ -203,7 +236,7 @@ func (te *TaskExecutor) topologicalSort(taskNames []string) ([]string, error) {
 	return order, nil
 }
 
-func (te *TaskExecutor) findReadyTasks(pending map[string]bool, results map[string]*TaskResult) []string {
+func (te *TaskExecutor) findReadyTasks(pending map[string]bool, results map[string]*TaskResult, taskSet map[string]bool) []string {
 	var ready []string
 
 	for name := range pending {
@@ -211,6 +244,9 @@ func (te *TaskExecutor) findReadyTasks(pending map[string]bool, results map[stri
 
 		allDepsDone := true
 		for _, dep := range task.DependsOn {
+			if !taskSet[dep] {
+				continue
+			}
 			result, exists := results[dep]
 			if !exists || (result.State != StateCompleted && result.State != StateSkipped) {
 				allDepsDone = false
@@ -272,4 +308,3 @@ func skipIfPlan(predicate func(*WorkPlan) bool) SkipCondition {
 		return predicate(args.Plan)
 	}
 }
-

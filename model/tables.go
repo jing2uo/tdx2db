@@ -155,3 +155,20 @@ var TableHoliday = SchemaFromStruct(
 	[]string{""},
 )
 
+var TableBlockInfo = SchemaFromStruct(
+	"raw_tdx_blocks_info",
+	BlockInfo{},
+	[]string{"block_code"},
+)
+
+var TableBlockMember = SchemaFromStruct(
+	"raw_tdx_blocks_member",
+	BlockMember{},
+	[]string{"block_code", "stock_symbol"},
+)
+
+var TableSymbolName = SchemaFromStruct(
+	"raw_symbol_name",
+	SymbolName{},
+	[]string{"symbol"},
+)
