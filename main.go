@@ -80,15 +80,23 @@ func main() {
 	}()
 
 	versionStr := buildVersionString()
+	var tempDirOverride string
 	var rootCmd = &cobra.Command{
 		Use:           "tdx2db",
 		Short:         "Load TDX Data to DuckDB",
 		SilenceErrors: true,
 		Version:       versionStr,
+		PersistentPreRunE: func(c *cobra.Command, args []string) error {
+			return cmd.OverrideTempDir(tempDirOverride)
+		},
 	}
 	// 预注册 -v 短选项；cobra 默认只挂 --version
 	rootCmd.Flags().BoolP("version", "v", false, "version for tdx2db")
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
+	// --temp: 把临时目录的父目录从默认 $TMPDIR 切到指定路径,
+	// 适用 $TMPDIR (常见 /tmp tmpfs) 容量被占满时的兜底。
+	rootCmd.PersistentFlags().StringVar(&tempDirOverride, "temp", "",
+		"临时文件父目录, 留空走 $TMPDIR")
 
 	var versionCmd = &cobra.Command{
 		Use:   "version",
