@@ -42,6 +42,22 @@ func (d *DuckDBDriver) GetLatestDate(tableName string, dateCol string) (time.Tim
 	return latest.Time, nil
 }
 
+func (d *DuckDBDriver) GetMinDate(tableName string, dateCol string) (time.Time, error) {
+	query := fmt.Sprintf("SELECT DATE(min(%s)) AS earliest FROM %s", dateCol, tableName)
+
+	var earliest sql.NullTime
+	err := d.db.Get(&earliest, query)
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	if !earliest.Valid {
+		return time.Time{}, nil
+	}
+
+	return earliest.Time, nil
+}
+
 func (d *DuckDBDriver) GetSymbolsByClass(classes ...string) ([]string, error) {
 	if len(classes) == 0 {
 		return nil, nil
