@@ -6,7 +6,7 @@
 ```
 ./model/
 ├── classify.go  # Symbol classification + PriceScale + SymbolFromCode
-├── schema.go    # Data structs (KlineDay, KlineMin, BasicDaily, Factor, GbbqData, Meta, Holiday, SymbolClass)
+├── schema.go    # Data structs (KlineDay, KlineMin, BasicDaily, Factor, GbbqData, Meta, Holiday, SymbolClass, BlockInfo, BlockMember, SymbolName)
 ├── tables.go    # Table metadata registry (SchemaFromStruct)
 └── views.go     # View ID registry (DefineView)
 ```
@@ -31,6 +31,9 @@
 | GbbqData | raw_gbbq | 股本变迁: category + C1-C4 (cat=1 除权 / 11 ETF 折算 / 2-10 股本变动) |
 | Meta | _meta | Key-value metadata (schema version, etc.) |
 | Holiday | raw_holidays | Holiday dates (来自 gbbq.zip 内嵌 zhb.zip 的 needini.dat) |
+| BlockInfo | raw_tdx_blocks_info | 在线板块/行业/概念信息 (block_type/name/symbol/code/parent/level) |
+| BlockMember | raw_tdx_blocks_member | 在线板块成分关系 (stock_symbol + block_code) |
+| SymbolName | raw_symbol_name | 在线代码名称 (symbol/name/class) |
 
 ## CONVENTIONS
 

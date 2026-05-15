@@ -1,10 +1,10 @@
 # PROJECT KNOWLEDGE BASE
 
-**Updated:** 2026-05-13
-**Branch:** main
+**Updated:** 2026-05-15
+**Branch:** feat/opentdx-online
 
 ## OVERVIEW
-通达信(TDX) stock data importer — loads .day/.01/.5 files to DuckDB/ClickHouse, calculates preclose/turnover/market-value (basic), and 后复权因子 (hfq_factor). basic/factor 链路覆盖 stock + ETF (含 LOF/老封基/B股)。
+通达信(TDX) stock data importer — loads .day/.01/.5 files to DuckDB/ClickHouse, pulls online code names + block/industry/concept data via OpenTDX protocol, calculates preclose/turnover/market-value (basic), and 后复权因子 (hfq_factor). basic/factor 链路覆盖 stock + ETF (含 LOF/老封基/B股)。
 
 Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_meta` table stores the schema version; init/cron check major version compatibility at startup.
 
@@ -28,13 +28,13 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 | Task | Location | Notes |
 |------|----------|-------|
 | Add new database backend | ./database/ | Implement DataRepository interface |
-| Parse new TDX format | ./tdx/ | Binary format parsers (day, minline, blocks) |
+| Parse new TDX format | ./tdx/ | Binary format parsers (day, minline, gbbq, holidays) + online OpenTDX client data |
 | Modify basic calculation | ./calc/basic.go | preclose / turnover / market-value |
 | Modify HFQ factor | ./calc/fq_quantaxis.go | 后复权因子算法 |
 | Add CLI command | ./cmd/ + main.go | Cobra subcommand with ctx cancel support |
 | Data model changes | ./model/ | Schema + struct tags + table/view registry |
 | Database queries | ./database/*/dml.go | DB-specific query implementations |
-| Add/modify workflow task | ./workflow/tasks.go | Define task with dependencies |
+| Add/modify workflow task | ./workflow/task_*.go | Define task with dependencies; each task self-registers in init() |
 | Run specific tasks | ./workflow/engine.go | Use TaskExecutor with task names |
 
 ## CODE MAP
@@ -56,9 +56,14 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 | BasicDaily | type | model/schema.go:49 | Calculated basic (preclose/turnover/MV, stock+ETF) |
 | Factor | type | model/schema.go:41 | Adjust factor (hfq_factor) |
 | GbbqData | type | model/schema.go:61 | 股本变迁 data (cat 1=除权, 11=ETF份额折算, 2/3/5/7/8/9/10=股本变动) |
+| BlockInfo | type | model/schema.go:75 | 在线板块/概念/行业信息 |
+| BlockMember | type | model/schema.go:84 | 在线板块成分关系 |
+| SymbolName | type | model/schema.go:89 | 在线代码名称 (symbol/name/class) |
 | ClassifyCode | func | model/classify.go:58 | symbol → stock/index/etf/block/unknown |
 | PriceScale | func | model/classify.go:89 | TDX 原始整数价格换算 (股票=100, ETF/B股=1000) |
 | SchemaFromStruct | func | model/tables.go:54 | Reflect-based table registration |
+| FetchOnlineBlocks | func | tdx/block.go:40 | 通过 OpenTDX 协议拉取在线板块/概念/行业数据 |
+| FetchOnlineSymbolNames | func | tdx/stock.go:18 | 通过 TDX 0x44d 接口拉取沪深京在线代码名称 |
 
 ## CONVENTIONS
 
@@ -67,7 +72,7 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 - DuckDB: `duckdb://[path]`
 
 **Table naming:**
-- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays)
+- `raw_*` — raw imported data (raw_kline_daily, raw_kline_1min, raw_basic_daily, raw_adjust_factor, raw_gbbq, raw_symbol_class, raw_holidays, raw_tdx_blocks_info, raw_tdx_blocks_member, raw_symbol_name)
 - `v_*` — views，按 (class, fq) 拆成 6 个：v_{stock,etf}_{bfq,qfq,hfq}；stock 价格 ROUND 2 位，ETF 3 位
 - `_meta` — schema version metadata (key/value store)
 
@@ -80,6 +85,11 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 - All .day/.01 files collected by suffix, filtered only by `^(sh|sz|bj)\d+$` regex
 - No prefix whitelist — full ingest of everything TDX provides
 - Symbol classification via `raw_symbol_class` table (rebuilt after each daily import)
+
+**Online OpenTDX data:**
+- `tdx/block.go` uses OpenTDX protocol requests to fetch block/industry/concept info + memberships into `raw_tdx_blocks_info` / `raw_tdx_blocks_member`
+- `tdx/stock.go` uses the TDX quote server `0x44d` interface to fetch online code names into `raw_symbol_name`
+- `update_blocks` and `update_symbol_names` are independent update tasks; they truncate + reimport their target tables
 
 **Symbol classification (model/classify.go):**
 - `ClassifyCode(symbol) → stock/index/etf/block/unknown`
@@ -159,16 +169,16 @@ Input: `[]BasicDaily` + `[]GbbqData` → Output: `[]Factor`
 ## UNIQUE STYLES
 
 **Task-based workflow (workflow/):**
-- `TaskExecutor` (engine.go) manages 任务执行 + DAG 拓扑排序
+- `TaskExecutor` (engine.go) manages 任务执行 + DAG 拓扑排序；ready tasks 持续并发调度，失败时 cancel run context 并等待已启动任务收尾
 - `WorkPlan` (plan.go) 在任务图启动前汇总日历 + 各表最新日期，决定 NeedDaily/NeedGbbq/NeedBasic/NeedFactor/NeedHolidays；任务的 `SkipIf` 只读 plan，不再各自查询数据库
 - `TradingCalendar` (calendar.go) 用 raw_holidays + 周末规则识别交易日，下载日线/分时遇到 404 时区分"节假日跳过"/"数据未发布"
-- Tasks defined in `workflow/tasks.go` with explicit `DependsOn`
-- Parallel execution of tasks with no dependencies
+- Tasks split by concern into `workflow/task_*.go` files; each task calls `registerTask()` in init with explicit `DependsOn`
+- Parallel execution of ready tasks whose selected in-graph dependencies are completed/skipped; dependencies outside the requested task set are ignored
 - Optional tasks via `SkipIf` condition (e.g., `--min`)
 - Error modes: `ErrorModeStop` (default) vs `ErrorModeSkip`
 
 **Incremental update logic:**
-- `cron` command 先 `BuildWorkPlan(db, today)` → 全 `Skip` 则直接退出，否则跑 DAG: `update_daily → update_gbbq → calc_basic → calc_factor`，并行 `update_holidays`
+- `cron` command 先 `BuildWorkPlan(db, today)` → 全 `Skip` 则直接退出，否则跑 DAG: `update_daily → fetch_gbbq → update_gbbq → calc_basic → calc_factor`；`update_holidays` depends on `fetch_gbbq`，`update_blocks` / `update_symbol_names` 独立并行
 - raw_holidays 为空（首次/旧库）时 plan 强制走全流程，让 holidays 自行写入
 - `calc_basic` 和 `calc_factor` 永远 truncate + 重算（依赖完整历史）
 - 1min 增量导入由 `--min` 控制（可选任务）
@@ -210,4 +220,6 @@ tdx2db init --dburi 'clickhouse://localhost' --dayfiledir /path/to/vipdoc/
 - ETF/LOF/B股 K线价格按 0.001 元解析 (`PriceScale`)，否则有 10x 偏差；新增品种前缀时务必检查
 - ETF 拆分日 (cat=11) PreClose 必须除以 Splitc3，否则当天涨跌幅会异常
 - `raw_symbol_class` is rebuilt from `raw_kline_daily` on each daily import — adding classification rules retroactively will auto-classify on next import
+- `raw_symbol_name` comes from online quote-server code-name data and is separate from `raw_symbol_class`; class is stored from the online list but basic/factor still use `raw_symbol_class`
+- `raw_tdx_blocks_info` / `raw_tdx_blocks_member` come from online OpenTDX block data and are not part of basic/factor calculation
 - holidays 来自 gbbq.zip 内嵌的 zhb.zip (needini.dat)，不再依赖 tdxhome 安装目录

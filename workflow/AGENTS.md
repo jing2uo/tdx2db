@@ -5,18 +5,19 @@
 ## STRUCTURE
 ```
 ./workflow/
-├── engine.go    # TaskExecutor, Task, TaskArgs (含 Plan), TaskResult
-├── tasks.go     # Task definitions (init/update modes) + executors
-├── plan.go      # WorkPlan + BuildWorkPlan (cron 启动前的全局规划)
-└── calendar.go  # TradingCalendar (节假日/周末/最近交易日)
+├── engine.go          # TaskExecutor, Task, TaskArgs (含 Plan), TaskResult, registerTask
+├── task_*.go          # Task definitions (init/update modes) + executors, split by concern
+├── tdx_helper.go      # shared date-range pull helpers for TDX archives
+├── plan.go            # WorkPlan + BuildWorkPlan (cron 启动前的全局规划)
+└── calendar.go        # TradingCalendar (节假日/周末/最近交易日)
 ```
 
 ## WHERE TO LOOK
 | Task | File | Notes |
 |------|------|-------|
-| Add new task | tasks.go | Define task with dependencies |
+| Add new task | task_*.go | Define task with dependencies and call `registerTask()` in init |
 | Run specific tasks | engine.go | Use TaskExecutor.Run with task names |
-| Modify task logic | tasks.go | Update executor function |
+| Modify task logic | task_*.go | Update executor function in the concern-specific file |
 | 调整 cron 跑哪些任务 | plan.go | BuildWorkPlan / NeedXxx 推导 |
 | 节假日判定 | calendar.go | TradingCalendar |
 
@@ -68,6 +69,10 @@ TaskCalcBasic = &Task{
 - `executeDailyImport()` - Shared logic for daily data conversion + import
 - `executeUpdateDaily()` - Downloads data, then calls `executeDailyImport()`
 - `executeInitDaily()` - Uses user-provided directory, then calls `executeDailyImport()`
+- `fetch_gbbq` downloads/extracts gbbq.zip once; `update_gbbq` decodes gbbq and `update_holidays` reads embedded zhb.zip from that extracted directory
+- `fetch_tick` downloads TIC archives and stores valid dates in `args.Extra[ExtraTickValidDates]`; `update_1min` imports only those dates
+- `update_blocks` pulls online block/industry/concept data into raw_tdx_blocks_info/raw_tdx_blocks_member
+- `update_symbol_names` pulls online code names into raw_symbol_name
 
 **TaskArgs:**
 - `Min` - bool, 设为 true 时 cron 会跑 update_1min
@@ -80,6 +85,11 @@ TaskCalcBasic = &Task{
 - `BuildWorkPlan(db, today)`：先读 `raw_holidays`，空表（首次/旧库）→ 强制全流程跑；否则用 `TradingCalendar.LastTradingDayOnOrBefore(today)` 与各表最新日期比较，标记 `NeedDaily/NeedGbbq/NeedBasic/NeedFactor/NeedHolidays`
 - `plan.AnyNeeded() == false` → cron 直接退出
 - `Calendar` 还会回流到 `prepareTdxData`，下载日线 404 时区分"节假日跳过 🎉"/"周末 🌴"/"未发布 ⏳"
+
+**Executor behavior:**
+- `topologicalSort()` and `findReadyTasks()` ignore dependencies that are not in the selected task set, so partial task runs only require in-graph deps
+- Ready tasks are started as soon as their selected deps are completed/skipped; the executor does not wait for a whole dependency layer to finish before launching newly ready tasks
+- On `ErrorModeStop` failure, executor cancels the run context and drains already-started task goroutines before returning the wrapped task error
 
 ## ANTI-PATTERNS
 
@@ -96,7 +106,10 @@ TaskCalcBasic = &Task{
 ## NOTES
 
 **Task chains:**
-- Update mode: `update_daily → update_gbbq → calc_basic → calc_factor → update_1min → update_holidays`
+- Update mode includes independent roots: `update_daily`, `fetch_gbbq`, `fetch_tick`, `update_blocks`, `update_symbol_names`
+- Core daily chain: `update_daily + fetch_gbbq → update_gbbq → calc_basic → calc_factor`
+- Holidays chain: `fetch_gbbq → update_holidays`
+- Minute chain: `fetch_tick → update_1min` (only when `--min`)
 - Init mode: `init_daily` (only import daily data from user-provided directory)
 
 **calc_basic and calc_factor run in full recalculation mode** — they truncate the target table and reimport all rows. This is intentional because preclose/factor depend on the entire history chain.
@@ -147,4 +160,3 @@ executor.Run(ctx, workflow.GetUpdateTaskNames(), args)
 **Init behavior:**
 - Only imports daily data from `--dayfiledir`
 - Does NOT calculate basic indicators or factors (use cron for that)
-

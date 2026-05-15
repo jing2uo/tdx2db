@@ -176,6 +176,7 @@ tdx2db convert -h   # 其他类型查看 help
 
 ## 致谢
 
+- 在线代码名称、板块 / 行业 / 概念数据的协议处理与解析逻辑，参考并转写自 [opentdx](https://github.com/LisonEvf/opentdx) 项目；感谢其对通达信公开行情协议的梳理与实现，让 tdx2db 能以 Go 版本接入这部分在线数据。
 - Windows 和 macOS 下的日线合并由 [@Abelonx](https://github.com/Abelonx) 在 [#60](https://github.com/jing2uo/tdx2db/pull/60) 贡献的 native Go 实现支持，让 tdx2db 摆脱了对 Linux datatool 二进制的依赖。
 
 
