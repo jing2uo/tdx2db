@@ -18,6 +18,7 @@ func init() {
 		Name:      "update_blocks",
 		DependsOn: []string{},
 		Executor:  executeUpdateBlocks,
+		OnError:   ErrorModeSkip,
 	}
 	registerTask(TaskUpdateBlocks, "update")
 }
