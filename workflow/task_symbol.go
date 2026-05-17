@@ -18,6 +18,7 @@ func init() {
 		Name:      "update_symbol_names",
 		DependsOn: []string{},
 		Executor:  executeUpdateSymbolNames,
+		OnError:   ErrorModeSkip,
 	}
 	registerTask(TaskUpdateSymbolNames, "update")
 }
