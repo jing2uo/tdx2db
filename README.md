@@ -5,7 +5,6 @@
 # tdx2db - 获得专属的 A 股行情数据库
 
 [![GitHub release](https://img.shields.io/github/v/release/jing2uo/tdx2db?style=flat-square)](https://github.com/jing2uo/tdx2db/releases)
-[![Docker Image](https://img.shields.io/badge/docker-pull-blue?style=flat-square&logo=docker)](https://github.com/jing2uo/tdx2db/pkgs/container/tdx2db)
 [![License](https://img.shields.io/github/license/jing2uo/tdx2db?style=flat-square)](LICENSE)
 
 将通达信行情数据导入本地数据库，支持 DuckDB 和 ClickHouse。
@@ -36,12 +35,6 @@ sudo mv tdx2db /usr/local/bin/ && tdx2db -h
 
 提供 Linux (amd64/arm64)、macOS (arm64)、Windows (amd64) 预编译版本。Windows / macOS 会跳过 1 分钟分时数据的下载与导入，日线正常处理。
 
-### Docker
-
-```bash
-docker run --rm --platform=linux/amd64 ghcr.io/jing2uo/tdx2db:latest -h
-```
-
 ## 使用
 
 ### 初始化
@@ -70,14 +63,6 @@ tdx2db init --dburi 'duckdb://./tdx.db' --dayfiledir ./vipdoc
 # ClickHouse: clickhouse://[user[:password]@][host][:port][/database][?http_port=...]
 # 默认值: user=default, password="", port=9000, http_port=8123, database=default
 tdx2db init --dburi 'clickhouse://localhost' --dayfiledir ./vipdoc
-```
-
-Docker 用法（后续命令同理替换）：
-
-```shell
-docker run --rm --platform=linux/amd64 -v "$(pwd)":/data \
-  ghcr.io/jing2uo/tdx2db:latest \
-  init --dayfiledir /data/vipdoc --dburi 'duckdb:///data/tdx.db'
 ```
 
 ### 增量更新
@@ -135,14 +120,6 @@ select * from v_etf_hfq where symbol='sh510300' order by date;
 
 复权算法来自 QUANTAXIS，原理参考[这里](https://www.yuque.com/zhoujiping/programming/eb17548458c94bc7c14310f5b38cf25c#djL6L)。后复权结果和 QUANTAXIS、通达信等比复权一致；前复权结果和雪球、新浪也一致。
 
-## 通达信数据转 CSV
-
-`convert` 命令支持转换通达信日线 / 1 分钟分时文件以及四代行情 / TIC 压缩包到 CSV，四代数据可在[每日数据](https://www.tdx.com.cn/article/daydata.html)下载。
-
-```shell
-tdx2db convert -t day -i ./vipdoc/ -o ./
-tdx2db convert -h   # 查看其他类型
-```
 
 ## 致谢
 

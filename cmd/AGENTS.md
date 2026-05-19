@@ -1,6 +1,6 @@
 # CLI COMMANDS
 
-**Purpose:** Cobra CLI commands (init, cron, convert) — thin wrappers over workflow engine
+**Purpose:** Cobra CLI commands (init, cron) — thin wrappers over workflow engine
 
 ## STRUCTURE
 ```
@@ -8,8 +8,7 @@
 ├── common.go          # Shared constants (paths, GetToday)
 ├── schema_version.go  # Schema version check logic (writeSchemaVersion/checkSchemaVersion)
 ├── init.go            # Full import (calls workflow with init tasks)
-├── cron.go            # Incremental update (calls workflow with update tasks)
-└── convert.go         # TDX to CSV conversion (standalone, no DB)
+└── cron.go            # Incremental update (calls workflow with update tasks)
 ```
 
 ## WHERE TO LOOK
@@ -60,12 +59,6 @@
    - Independent online tasks: `update_blocks`, `update_symbol_names`
    - Optional: `fetch_tick` → `update_1min` (via --min)
 5. calc_basic and calc_factor run full recalculation (truncate + reimport)
-
-**convert command:**
-- Types: `day`, `1min`, `tic4`, `day4`
-- Input: directory or zip file
-- Output: CSV files
-- Standalone: no database connection needed
 
 ## ANTI-PATTERNS
 
