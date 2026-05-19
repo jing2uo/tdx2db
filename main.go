@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"runtime/debug"
-	"strings"
 	"syscall"
 
 	"github.com/jing2uo/tdx2db/cmd"
@@ -57,14 +56,6 @@ Database URI:
 const dayFileInfo = "通达信日线文件目录"
 const minInfo = "导入 1 分钟分时数据（可选）"
 
-const convertHelp = `
-
-Type & Input:
-  -t day   转换日线文件          -i 包含 .day 的目录
-  -t 1min  转换 1 分钟分时       -i 包含 .1 的目录
-  -t tic4  四代分笔转 1 分钟分时 -i 四代 TIC 压缩文件
-  -t day4  转换四代日线          -i 四代行情压缩文件`
-
 func main() {
 	// 创建可取消的 context
 	ctx, cancel := context.WithCancel(context.Background())
@@ -110,11 +101,6 @@ func main() {
 		dbURI      string
 		dayFileDir string
 		minEnable  bool
-
-		// Convert
-		inputType  string
-		inputPath  string
-		outputPath string
 	)
 
 	var initCmd = &cobra.Command{
@@ -137,34 +123,6 @@ func main() {
 		},
 	}
 
-	var convertCmd = &cobra.Command{
-		Use:   "convert",
-		Short: "Convert TDX data to CSV",
-		Example: `  tdx2db convert -t day -i /path/to/vipdoc/ -o ./
-  tdx2db convert -t day4 -i /path/to/20251212.zip -o ./` + convertHelp,
-		RunE: func(c *cobra.Command, args []string) error {
-			opts := cmd.ConvertOptions{
-				InputPath:  inputPath,
-				OutputPath: outputPath,
-			}
-
-			switch strings.ToLower(inputType) {
-			case "day":
-				opts.InputType = cmd.DayFileDir
-			case "1min":
-				opts.InputType = cmd.Min1FileDir
-			case "tic4":
-				opts.InputType = cmd.TicZip
-			case "day4":
-				opts.InputType = cmd.DayZip
-			default:
-				return fmt.Errorf("未知的类型: %s%s", inputType, convertHelp)
-			}
-
-			return cmd.Convert(ctx, opts)
-		},
-	}
-
 	// Init Flags
 	initCmd.Flags().StringVar(&dbURI, "dburi", "", dbURIInfo)
 	initCmd.Flags().StringVar(&dayFileDir, "dayfiledir", "", dayFileInfo)
@@ -176,17 +134,8 @@ func main() {
 	cronCmd.MarkFlagRequired("dburi")
 	cronCmd.Flags().BoolVar(&minEnable, "min", false, minInfo)
 
-	// Convert Flags
-	convertCmd.Flags().StringVarP(&inputType, "type", "t", "", "转换类型")
-	convertCmd.Flags().StringVarP(&inputPath, "input", "i", "", "输入文件或目录路径")
-	convertCmd.Flags().StringVarP(&outputPath, "output", "o", "", "CSV 文件输出目录")
-	convertCmd.MarkFlagRequired("type")
-	convertCmd.MarkFlagRequired("input")
-	convertCmd.MarkFlagRequired("output")
-
 	rootCmd.AddCommand(initCmd)
 	rootCmd.AddCommand(cronCmd)
-	rootCmd.AddCommand(convertCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	cobra.OnFinalize(func() {

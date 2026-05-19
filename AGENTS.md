@@ -15,7 +15,7 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 │   ├── basic.go           # preclose, turnover, floatmv, totalmv
 │   ├── fq_quantaxis.go    # HFQ factor (QUANTAXIS-based)
 │   └── fq_quantaxis_test.go
-├── cmd/        # CLI commands (init, cron, convert)
+├── cmd/        # CLI commands (init, cron)
 ├── database/   # DB interface + implementations (duckdb/clickhouse)
 ├── model/      # Data models, table registry, view registry
 ├── tdx/        # TDX binary format parsing
@@ -47,7 +47,6 @@ Current schema version: **v4.0** (`model.SchemaMajor=4, SchemaMinor=0`). The `_m
 | TaskExecutor | type | workflow/engine.go:66 | DAG-based task execution |
 | Init | func | cmd/init.go | Full import via workflow |
 | Cron | func | cmd/cron.go:11 | Incremental update via workflow |
-| Convert | func | cmd/convert.go | TDX to CSV conversion |
 | CalculateBasicDaily | func | calc/basic.go:115 | Core basic calculation (preclose/turnover/MV, stock+ETF) |
 | calculateFullHfq | func | calc/fq_quantaxis.go:86 | Core HFQ factor calculation |
 | BuildWorkPlan | func | workflow/plan.go:34 | 读 holidays + 各表最新日期，决定哪些任务要跑 |
