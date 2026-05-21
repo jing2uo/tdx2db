@@ -273,11 +273,12 @@ func mergeXdxrFromGbbq(m map[int]*xdxrInfo, idx int, data model.GbbqData) {
 		m[idx] = &xdxrInfo{}
 	}
 	info := m[idx]
+	// cat=1 字段顺序: C1=分红, C2=配股价, C3=送转股, C4=配股
 	info.Fenhong += data.C1
-	info.Peigu += data.C2
 	info.Songzhuangu += data.C3
-	if data.C4 > 0 {
-		info.Peigujia = data.C4
+	info.Peigu += data.C4
+	if data.C2 > 0 {
+		info.Peigujia = data.C2
 	}
 }
 
