@@ -46,7 +46,7 @@ func FetchOnlineSymbolNames(ctx context.Context) ([]model.SymbolName, error) {
 			continue
 		}
 		class := model.ClassifyCode(symbol)
-		if class != model.ClassStock && class != model.ClassETF && class != model.ClassIndex {
+		if !isOnlineSymbolNameClass(class) {
 			continue
 		}
 		names = append(names, model.SymbolName{
@@ -58,6 +58,14 @@ func FetchOnlineSymbolNames(ctx context.Context) ([]model.SymbolName, error) {
 	sort.Slice(names, func(i, j int) bool { return names[i].Symbol < names[j].Symbol })
 
 	return names, nil
+}
+
+func isOnlineSymbolNameClass(class string) bool {
+	switch class {
+	case model.ClassStock, model.ClassBStock, model.ClassETF, model.ClassIndex:
+		return true
+	}
+	return false
 }
 
 func (c *OnlineClient) LoginStandard() error {

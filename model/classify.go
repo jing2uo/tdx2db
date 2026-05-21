@@ -4,6 +4,7 @@ import "strings"
 
 const (
 	ClassStock   = "stock"
+	ClassBStock  = "bstock"
 	ClassIndex   = "index"
 	ClassETF     = "etf"
 	ClassBlock   = "block"
@@ -22,7 +23,7 @@ var classRules = []struct {
 	{"sh", "603", ClassStock}, {"sh", "605", ClassStock},
 	{"sh", "688", ClassStock}, {"sh", "689", ClassStock},
 	// 沪市 B 股
-	{"sh", "900", ClassStock},
+	{"sh", "900", ClassBStock},
 	// 沪市指数
 	{"sh", "000", ClassIndex},
 	// 通达信板块指数
@@ -38,7 +39,7 @@ var classRules = []struct {
 	{"sz", "300", ClassStock}, {"sz", "301", ClassStock},
 	{"sz", "302", ClassStock},
 	// 深市 B 股
-	{"sz", "20", ClassStock},
+	{"sz", "20", ClassBStock},
 	// 深市指数
 	{"sz", "399", ClassIndex},
 	// 深市 ETF (15) / LOF (16/18)
@@ -105,7 +106,7 @@ func SymbolFromCode(code string) (string, bool) {
 	bestPrefix := ""
 	bestMarket := ""
 	for _, r := range classRules {
-		if r.Class != ClassStock && r.Class != ClassETF {
+		if r.Class != ClassStock && r.Class != ClassETF && r.Class != ClassBStock {
 			continue
 		}
 		if !strings.HasPrefix(code, r.Prefix) {
