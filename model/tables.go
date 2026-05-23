@@ -18,8 +18,9 @@ const (
 )
 
 type Column struct {
-	Name string
-	Type DataType
+	Name     string
+	Type     DataType
+	Nullable bool
 }
 
 type TableMeta struct {
@@ -93,7 +94,9 @@ func SchemaFromStruct(tableName string, model interface{}, orderByKey []string) 
 			}
 		}
 
-		cols = append(cols, Column{Name: colName, Type: dType})
+		nullableTag := strings.ToLower(strings.TrimSpace(field.Tag.Get("nullable")))
+		nullable := nullableTag == "true" || nullableTag == "1" || nullableTag == "yes"
+		cols = append(cols, Column{Name: colName, Type: dType, Nullable: nullable})
 	}
 
 	meta := &TableMeta{
