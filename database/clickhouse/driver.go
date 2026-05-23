@@ -10,7 +10,6 @@ import (
 	"time"
 
 	_ "github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/jing2uo/tdx2db/model"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 )
@@ -24,8 +23,6 @@ type ClickHouseDriver struct {
 	httpImportUrl string
 	authUser      string
 	authPass      string
-
-	viewImpls map[model.ViewID]func() error
 }
 
 func NewClickHouseDriver(u *url.URL) (*ClickHouseDriver, error) {
@@ -89,7 +86,6 @@ func NewClickHouseDriver(u *url.URL) (*ClickHouseDriver, error) {
 		authUser:      user,
 		authPass:      pass,
 		database:      database,
-		viewImpls:     make(map[model.ViewID]func() error),
 	}, nil
 }
 

@@ -30,6 +30,14 @@ func (d *ClickHouseDriver) mapType(colName string, dt model.DataType) string {
 	}
 }
 
+func (d *ClickHouseDriver) createViewInternal(view model.ViewDef) error {
+	if view.ClickHouse == "" {
+		return fmt.Errorf("view %s has no ClickHouse SQL", view.Name)
+	}
+	_, err := d.db.Exec(fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", view.Name, view.ClickHouse))
+	return err
+}
+
 func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 	var colDefs []string
 	var dateCol, keyCol string
@@ -87,8 +95,7 @@ func cleanOrderByKey(keys []string) []string {
 	return result
 }
 
-// InitSchema 创建所有表 + 视图。
-// 视图实现由 views_stock.go / views_etf.go 各自注册。
+// InitSchema 创建所有表 + 视图，表与视图定义均来自 model registry。
 func (d *ClickHouseDriver) InitSchema() error {
 	for _, t := range model.AllTables() {
 		if err := d.createTableInternal(t); err != nil {
@@ -96,16 +103,9 @@ func (d *ClickHouseDriver) InitSchema() error {
 		}
 	}
 
-	d.registerStockViews()
-	d.registerETFViews()
-
-	for _, viewID := range model.AllViews() {
-		impl, ok := d.viewImpls[viewID]
-		if !ok {
-			return fmt.Errorf("[ClickHouse] Missing implementation for view: %s", viewID)
-		}
-		if err := impl(); err != nil {
-			return fmt.Errorf("failed to create view %s: %w", viewID, err)
+	for _, view := range model.AllViews() {
+		if err := d.createViewInternal(view); err != nil {
+			return fmt.Errorf("failed to create view %s: %w", view.Name, err)
 		}
 	}
 	return nil
