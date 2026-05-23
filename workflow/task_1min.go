@@ -15,7 +15,7 @@ var TaskUpdate1Min *Task
 func init() {
 	TaskUpdate1Min = &Task{
 		Name:      "update_1min",
-		DependsOn: []string{"fetch_tick"},
+		DependsOn: []string{"prepare_tic"},
 		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
 			return !args.Min
 		},
@@ -26,7 +26,7 @@ func init() {
 }
 
 func executeUpdate1Min(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
-	validDates, _ := args.Extra[ExtraTickValidDates].([]time.Time)
+	validDates, _ := args.Extra[ExtraTicValidDates].([]time.Time)
 	if len(validDates) == 0 {
 		fmt.Println("🌲 分时数据无需更新")
 		return &TaskResult{State: StateSkipped, Message: "no new 1min data"}, nil

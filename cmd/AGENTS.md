@@ -57,7 +57,7 @@
    - `update_daily + fetch_gbbq` → `update_gbbq` → `calc_basic` → `calc_factor`
    - `update_holidays` 依赖 `fetch_gbbq`，从 gbbq.zip 内嵌的 zhb.zip 读取 needini.dat
    - Independent online tasks: `update_blocks`, `update_symbol_names`
-   - Optional: `fetch_tick` → `update_1min` (via --min)
+   - Optional: `prepare_tic` → `update_1min` (via --min)
 5. calc_basic and calc_factor run full recalculation (truncate + reimport)
 
 ## ANTI-PATTERNS
