@@ -8,15 +8,13 @@ import (
 	"strings"
 
 	_ "github.com/duckdb/duckdb-go/v2"
-	"github.com/jing2uo/tdx2db/model"
 	"github.com/jmoiron/sqlx"
 	"github.com/jmoiron/sqlx/reflectx"
 )
 
 type DuckDBDriver struct {
-	dsn       string
-	db        *sqlx.DB
-	viewImpls map[model.ViewID]func() error
+	dsn string
+	db  *sqlx.DB
 }
 
 func NewDuckDBDriver(u *url.URL) (*DuckDBDriver, error) {
@@ -68,10 +66,7 @@ func NewDuckDBDriver(u *url.URL) (*DuckDBDriver, error) {
 		dbPath = fmt.Sprintf("%s?%s", dbPath, u.RawQuery)
 	}
 
-	return &DuckDBDriver{
-		dsn:       dbPath,
-		viewImpls: make(map[model.ViewID]func() error),
-	}, nil
+	return &DuckDBDriver{dsn: dbPath}, nil
 }
 
 func (d *DuckDBDriver) Connect() error {

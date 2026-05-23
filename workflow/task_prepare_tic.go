@@ -10,25 +10,25 @@ import (
 	"github.com/jing2uo/tdx2db/tdx"
 )
 
-// ExtraTickValidDates 是 fetch_tick 写入 args.Extra 的 key，
+// ExtraTicValidDates 是 prepare_tic 写入 args.Extra 的 key，
 // 值类型为 []time.Time，列出本轮成功下载到的分时日期。
-const ExtraTickValidDates = "tick_valid_dates"
+const ExtraTicValidDates = "tic_valid_dates"
 
-var TaskFetchTick *Task
+var TaskPrepareTic *Task
 
 func init() {
-	TaskFetchTick = &Task{
-		Name:      "fetch_tick",
+	TaskPrepareTic = &Task{
+		Name:      "prepare_tic",
 		DependsOn: []string{},
 		SkipIf: func(ctx context.Context, db database.DataRepository, args *TaskArgs) bool {
 			return !args.Min
 		},
-		Executor: executeFetchTick,
+		Executor: executePrepareTic,
 	}
-	registerTask(TaskFetchTick, "update")
+	registerTask(TaskPrepareTic, "update")
 }
 
-func executeFetchTick(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
+func executePrepareTic(ctx context.Context, db database.DataRepository, args *TaskArgs) (*TaskResult, error) {
 	latest, err := db.GetLatestDate(model.TableKline1Min.TableName, "datetime")
 	if err != nil {
 		return nil, fmt.Errorf("query 1min latest: %w", err)
@@ -48,7 +48,7 @@ func executeFetchTick(ctx context.Context, db database.DataRepository, args *Tas
 	}
 	validDates, err := pullDateRange(ctx, latest, src, args)
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch tick data: %w", err)
+		return nil, fmt.Errorf("failed to prepare tic data: %w", err)
 	}
 
 	if len(validDates) >= 30 {
@@ -58,10 +58,10 @@ func executeFetchTick(ctx context.Context, db database.DataRepository, args *Tas
 	if args.Extra == nil {
 		args.Extra = map[string]interface{}{}
 	}
-	args.Extra[ExtraTickValidDates] = validDates
+	args.Extra[ExtraTicValidDates] = validDates
 
 	if len(validDates) == 0 {
-		return &TaskResult{State: StateSkipped, Message: "no new tick data"}, nil
+		return &TaskResult{State: StateSkipped, Message: "no new tic data"}, nil
 	}
 
 	select {
@@ -76,5 +76,5 @@ func executeFetchTick(ctx context.Context, db database.DataRepository, args *Tas
 		return nil, fmt.Errorf("failed to run DatatoolTickCreate: %w", err)
 	}
 
-	return &TaskResult{State: StateCompleted, Rows: len(validDates), Message: "tick fetched"}, nil
+	return &TaskResult{State: StateCompleted, Rows: len(validDates), Message: "tic prepared"}, nil
 }

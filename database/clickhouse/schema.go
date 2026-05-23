@@ -8,26 +8,42 @@ import (
 )
 
 // mapType 针对 ClickHouse 进行类型优化
-func (d *ClickHouseDriver) mapType(colName string, dt model.DataType) string {
+func (d *ClickHouseDriver) mapType(col model.Column) string {
+	colName := col.Name
+	dt := col.Type
 	isKey := strings.Contains(strings.ToLower(colName), "symbol")
 
+	var sqlType string
 	switch dt {
 	case model.TypeString:
 		if isKey {
-			return "LowCardinality(String)"
+			sqlType = "LowCardinality(String)"
+		} else {
+			sqlType = "String"
 		}
-		return "String"
 	case model.TypeFloat64:
-		return "Float64"
+		sqlType = "Float64"
 	case model.TypeInt64:
-		return "Int64"
+		sqlType = "Int64"
 	case model.TypeDate:
-		return "Date32"
+		sqlType = "Date32"
 	case model.TypeDateTime:
-		return "DateTime64(0, 'Asia/Shanghai')"
+		sqlType = "DateTime64(0, 'Asia/Shanghai')"
 	default:
-		return "String"
+		sqlType = "String"
 	}
+	if col.Nullable {
+		return fmt.Sprintf("Nullable(%s)", sqlType)
+	}
+	return sqlType
+}
+
+func (d *ClickHouseDriver) createViewInternal(view model.ViewDef) error {
+	if view.ClickHouse == "" {
+		return fmt.Errorf("view %s has no ClickHouse SQL", view.Name)
+	}
+	_, err := d.db.Exec(fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", view.Name, view.ClickHouse))
+	return err
 }
 
 func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
@@ -36,7 +52,7 @@ func (d *ClickHouseDriver) createTableInternal(meta *model.TableMeta) error {
 
 	// 1. 构建列定义
 	for _, col := range meta.Columns {
-		sqlType := d.mapType(col.Name, col.Type)
+		sqlType := d.mapType(col)
 		colDefs = append(colDefs, fmt.Sprintf("%s %s", col.Name, sqlType))
 
 		// 自动探测用于排序键的列
@@ -87,8 +103,7 @@ func cleanOrderByKey(keys []string) []string {
 	return result
 }
 
-// InitSchema 创建所有表 + 视图。
-// 视图实现由 views_stock.go / views_etf.go 各自注册。
+// InitSchema 创建所有表 + 视图，表与视图定义均来自 model registry。
 func (d *ClickHouseDriver) InitSchema() error {
 	for _, t := range model.AllTables() {
 		if err := d.createTableInternal(t); err != nil {
@@ -96,16 +111,9 @@ func (d *ClickHouseDriver) InitSchema() error {
 		}
 	}
 
-	d.registerStockViews()
-	d.registerETFViews()
-
-	for _, viewID := range model.AllViews() {
-		impl, ok := d.viewImpls[viewID]
-		if !ok {
-			return fmt.Errorf("[ClickHouse] Missing implementation for view: %s", viewID)
-		}
-		if err := impl(); err != nil {
-			return fmt.Errorf("failed to create view %s: %w", viewID, err)
+	for _, view := range model.AllViews() {
+		if err := d.createViewInternal(view); err != nil {
+			return fmt.Errorf("failed to create view %s: %w", view.Name, err)
 		}
 	}
 	return nil

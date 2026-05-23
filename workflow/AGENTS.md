@@ -70,7 +70,7 @@ TaskCalcBasic = &Task{
 - `executeUpdateDaily()` - Downloads data, then calls `executeDailyImport()`
 - `executeInitDaily()` - Uses user-provided directory, then calls `executeDailyImport()`
 - `fetch_gbbq` downloads/extracts gbbq.zip once; `update_gbbq` decodes gbbq and `update_holidays` reads embedded zhb.zip from that extracted directory
-- `fetch_tick` downloads TIC archives and stores valid dates in `args.Extra[ExtraTickValidDates]`; `update_1min` imports only those dates
+- `prepare_tic` downloads TIC archives and stores valid dates in `args.Extra[ExtraTicValidDates]`; `update_1min` imports only those dates
 - `update_blocks` pulls online block/industry/concept data into raw_tdx_blocks_info/raw_tdx_blocks_member
 - `update_symbol_names` pulls online code names into raw_symbol_name
 
@@ -106,10 +106,10 @@ TaskCalcBasic = &Task{
 ## NOTES
 
 **Task chains:**
-- Update mode includes independent roots: `update_daily`, `fetch_gbbq`, `fetch_tick`, `update_blocks`, `update_symbol_names`
+- Update mode includes independent roots: `update_daily`, `fetch_gbbq`, `prepare_tic`, `update_blocks`, `update_symbol_names`
 - Core daily chain: `update_daily + fetch_gbbq → update_gbbq → calc_basic → calc_factor`
 - Holidays chain: `fetch_gbbq → update_holidays`
-- Minute chain: `fetch_tick → update_1min` (only when `--min`)
+- Minute chain: `prepare_tic → update_1min` (only when `--min`)
 - Init mode: `init_daily` (only import daily data from user-provided directory)
 
 **calc_basic and calc_factor run in full recalculation mode** — they truncate the target table and reimport all rows. This is intentional because preclose/factor depend on the entire history chain.

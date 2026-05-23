@@ -25,6 +25,14 @@ func (d *DuckDBDriver) mapType(dt model.DataType) string {
 	}
 }
 
+func (d *DuckDBDriver) createViewInternal(view model.ViewDef) error {
+	if view.DuckDB == "" {
+		return fmt.Errorf("view %s has no DuckDB SQL", view.Name)
+	}
+	_, err := d.db.Exec(fmt.Sprintf("CREATE OR REPLACE VIEW %s AS\n%s", view.Name, view.DuckDB))
+	return err
+}
+
 func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 	var colDefs []string
 	for _, col := range meta.Columns {
@@ -42,8 +50,7 @@ func (d *DuckDBDriver) createTableInternal(meta *model.TableMeta) error {
 	return nil
 }
 
-// InitSchema 创建所有表 + 视图。
-// 视图实现由 views_stock.go / views_etf.go 各自注册。
+// InitSchema 创建所有表 + 视图，表与视图定义均来自 model registry。
 func (d *DuckDBDriver) InitSchema() error {
 	for _, t := range model.AllTables() {
 		if err := d.createTableInternal(t); err != nil {
@@ -51,16 +58,9 @@ func (d *DuckDBDriver) InitSchema() error {
 		}
 	}
 
-	d.registerStockViews()
-	d.registerETFViews()
-
-	for _, viewID := range model.AllViews() {
-		impl, ok := d.viewImpls[viewID]
-		if !ok {
-			return fmt.Errorf("[DuckDB] Missing implementation for required view: %s", viewID)
-		}
-		if err := impl(); err != nil {
-			return fmt.Errorf("failed to create view %s: %w", viewID, err)
+	for _, view := range model.AllViews() {
+		if err := d.createViewInternal(view); err != nil {
+			return fmt.Errorf("failed to create view %s: %w", view.Name, err)
 		}
 	}
 	return nil
