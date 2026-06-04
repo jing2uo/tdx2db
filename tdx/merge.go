@@ -198,7 +198,7 @@ func makeDayRecord(date uint32, rec md1OHLCV) []byte {
 	binary.LittleEndian.PutUint32(buf[16:20], uint32(math.Round(rec.Close*100)))
 	binary.LittleEndian.PutUint32(buf[20:24], math.Float32bits(float32(rec.Amount)))
 	binary.LittleEndian.PutUint32(buf[24:28], rec.Volume)
-
+	binary.LittleEndian.PutUint32(buf[28:32], 0x10000)
 	return buf
 }
 
