@@ -97,10 +97,17 @@ func TestMakeDayRecord(t *testing.T) {
 		t.Errorf("amount = %f, want ~5239992522", amt)
 	}
 
-	// Verify reserved is zero
+	// Verify reserved == 0x10000 (TDX 正常记录标记)，否则读取端
+	// parseVolumeOverflow 会误判为溢出记录并把 volume ×100，导致虚高。
 	reserved := binary.LittleEndian.Uint32(buf[28:32])
-	if reserved != 0 {
-		t.Errorf("reserved = %d, want 0", reserved)
+	if reserved != 0x10000 {
+		t.Errorf("reserved = %#x, want 0x10000", reserved)
+	}
+
+	// 端到端：makeDayRecord 写出的 volume 经 parseVolumeOverflow 读回后
+	// 不应被 ×100。
+	if gotVol := parseVolumeOverflow(volRaw, reserved); gotVol != int64(rec.Volume) {
+		t.Errorf("parseVolumeOverflow round-trip = %d, want %d", gotVol, rec.Volume)
 	}
 }
 
