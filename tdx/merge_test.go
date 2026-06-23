@@ -20,8 +20,8 @@ func TestParseIncrFilename(t *testing.T) {
 		{"bj260318.md1", "bj", 20260318, false},
 		{"sh990101.md1", "sh", 19990101, false},
 		{"sh250610.md1", "sh", 20250610, false},
-		{"ab.md1", "", 0, true},       // too short
-		{"sh13.md1", "", 0, true},     // too short date part
+		{"ab.md1", "", 0, true},   // too short
+		{"sh13.md1", "", 0, true}, // too short date part
 	}
 
 	for _, tt := range tests {
@@ -97,17 +97,16 @@ func TestMakeDayRecord(t *testing.T) {
 		t.Errorf("amount = %f, want ~5239992522", amt)
 	}
 
-	// Verify reserved == 0x10000 (TDX 正常记录标记)，否则读取端
-	// parseVolumeOverflow 会误判为溢出记录并把 volume ×100，导致虚高。
+	// Verify generated records keep the conventional reserved value.
+	// The reader ignores this field when parsing volume.
 	reserved := binary.LittleEndian.Uint32(buf[28:32])
 	if reserved != 0x10000 {
 		t.Errorf("reserved = %#x, want 0x10000", reserved)
 	}
 
-	// 端到端：makeDayRecord 写出的 volume 经 parseVolumeOverflow 读回后
-	// 不应被 ×100。
-	if gotVol := parseVolumeOverflow(volRaw, reserved); gotVol != int64(rec.Volume) {
-		t.Errorf("parseVolumeOverflow round-trip = %d, want %d", gotVol, rec.Volume)
+	// End-to-end: makeDayRecord volume should round-trip unchanged.
+	if gotVol := parseDayVolume(volRaw, reserved); gotVol != int64(rec.Volume) {
+		t.Errorf("parseDayVolume round-trip = %d, want %d", gotVol, rec.Volume)
 	}
 }
 
