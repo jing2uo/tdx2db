@@ -19,7 +19,6 @@ const (
 	recordSize = 32
 )
 
-// ConvertFilesToCSV 转换 TDX 文件到 CSV
 func ConvertFilesToCSV(ctx context.Context, inputDir string, outputFile string, suffix string) (string, error) {
 	switch suffix {
 	case ".day":
@@ -203,11 +202,10 @@ func parseDate(d uint32) (time.Time, error) {
 	return time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.Local), nil
 }
 
-// parseDayVolume returns the .day volume field as shares.
-// The reserved field has varied values in official TDX files and is not a
-// volume overflow marker.
 func parseDayVolume(volRaw, reserved uint32) int64 {
-	_ = reserved
+	if reserved&0xffffff00 == 0xc3640000 {
+		return int64(volRaw)*100 + int64(reserved&0xff)
+	}
 	return int64(volRaw)
 }
 
@@ -224,7 +222,6 @@ func parseDateTime(dateRaw, timeRaw uint16) (time.Time, error) {
 	return time.Date(year, time.Month(month), day, hour, minute, 0, 0, time.Local), nil
 }
 
-// symbolPattern 合法 symbol 格式: 市场前缀 + 纯数字 (sh600000 / sz000001 / bj830000)
 var symbolPattern = regexp.MustCompile(`^(sh|sz|bj)\d+$`)
 
 func collectFiles(root string, suffix string) ([]string, error) {
