@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestParseDayVolumeIgnoresReserved(t *testing.T) {
+func TestParseDayVolume(t *testing.T) {
 	tests := []struct {
 		name     string
 		volRaw   uint32
@@ -18,6 +18,8 @@ func TestParseDayVolumeIgnoresReserved(t *testing.T) {
 		{"early sh reserved 1000", 174_085_000, 0x000003E8, 174_085_000},
 		{"early sh reserved 3139", 40_631_800, 0x00000C43, 40_631_800},
 		{"nonzero low byte", 478_000_000, 0x0000002A, 478_000_000},
+		{"tdx hands marker", 47_846_559, 0xc364002f, 4_784_655_947},
+		{"tdx hands marker exact", 47_846_560, 0xc3640000, 4_784_656_000},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,5 +54,31 @@ func TestProcessDayFileIgnoresReservedForVolume(t *testing.T) {
 	}
 	if rows[0].Close != 27.75 {
 		t.Errorf("close = %f, want 27.75", rows[0].Close)
+	}
+}
+
+func TestProcessDayFileScalesC364VolumeMarker(t *testing.T) {
+	data := make([]byte, recordSize)
+	binary.LittleEndian.PutUint32(data[0:4], 20260312)
+	binary.LittleEndian.PutUint32(data[4:8], 352)
+	binary.LittleEndian.PutUint32(data[8:12], 380)
+	binary.LittleEndian.PutUint32(data[12:16], 350)
+	binary.LittleEndian.PutUint32(data[16:20], 380)
+	binary.LittleEndian.PutUint32(data[20:24], math.Float32bits(float32(17_458_274_304)))
+	binary.LittleEndian.PutUint32(data[24:28], 47_846_559)
+	binary.LittleEndian.PutUint32(data[28:32], 0xc364002f)
+
+	rows, err := processDayFile(data, "sh601868")
+	if err != nil {
+		t.Fatalf("processDayFile: %v", err)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("len(rows) = %d, want 1", len(rows))
+	}
+	if rows[0].Volume != 4_784_655_947 {
+		t.Errorf("volume = %d, want 4784655947", rows[0].Volume)
+	}
+	if rows[0].Close != 3.8 {
+		t.Errorf("close = %f, want 3.8", rows[0].Close)
 	}
 }
