@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/jing2uo/tdx2db/model"
 )
 
 const (
@@ -181,21 +183,23 @@ func readMd1Block(md1Data []byte, seqNum uint16) (md1OHLCV, error) {
 // .day file format (32 bytes per record, little-endian):
 //
 //	[0:4]   uint32   date (YYYYMMDD)
-//	[4:8]   uint32   open (price * 100)
-//	[8:12]  uint32   high (price * 100)
-//	[12:16] uint32   low (price * 100)
-//	[16:20] uint32   close (price * 100)
+//	[4:8]   uint32   open (price * scale)
+//	[8:12]  uint32   high (price * scale)
+//	[12:16] uint32   low (price * scale)
+//	[16:20] uint32   close (price * scale)
 //	[20:24] float32  amount (IEEE 754)
 //	[24:28] uint32   volume
 //	[28:32] uint32   reserved
-func makeDayRecord(date uint32, rec md1OHLCV) []byte {
+//
+// scale 由 model.PriceScale(symbol) 决定: 股票=100, ETF/LOF/B股=1000
+func makeDayRecord(date uint32, rec md1OHLCV, scale float64) []byte {
 	buf := make([]byte, recordSize)
 
 	binary.LittleEndian.PutUint32(buf[0:4], date)
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(math.Round(rec.Open*100)))
-	binary.LittleEndian.PutUint32(buf[8:12], uint32(math.Round(rec.High*100)))
-	binary.LittleEndian.PutUint32(buf[12:16], uint32(math.Round(rec.Low*100)))
-	binary.LittleEndian.PutUint32(buf[16:20], uint32(math.Round(rec.Close*100)))
+	binary.LittleEndian.PutUint32(buf[4:8], uint32(math.Round(rec.Open*scale)))
+	binary.LittleEndian.PutUint32(buf[8:12], uint32(math.Round(rec.High*scale)))
+	binary.LittleEndian.PutUint32(buf[12:16], uint32(math.Round(rec.Low*scale)))
+	binary.LittleEndian.PutUint32(buf[16:20], uint32(math.Round(rec.Close*scale)))
 	binary.LittleEndian.PutUint32(buf[20:24], math.Float32bits(float32(rec.Amount)))
 	binary.LittleEndian.PutUint32(buf[24:28], rec.Volume)
 	binary.LittleEndian.PutUint32(buf[28:32], 0x10000)
@@ -237,7 +241,9 @@ func mergeSingleDay(vipdocDir, exchange string, date uint32, codFile, md1File st
 		dayFileName := fmt.Sprintf("%s%s.day", exchange, ent.StockCode)
 		dayFilePath := filepath.Join(ldayDir, dayFileName)
 
-		dayRec := makeDayRecord(date, ohlcv)
+		symbol := exchange + ent.StockCode
+		scale := model.PriceScale(symbol)
+		dayRec := makeDayRecord(date, ohlcv, scale)
 
 		if err := appendDayRecord(dayFilePath, date, dayRec); err != nil {
 			continue
