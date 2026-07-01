@@ -51,7 +51,7 @@ func TestMakeDayRecord(t *testing.T) {
 		Volume: 3555100,
 	}
 
-	buf := makeDayRecord(20260318, rec)
+	buf := makeDayRecord(20260318, rec, 100)
 
 	if len(buf) != recordSize {
 		t.Fatalf("expected %d bytes, got %d", recordSize, len(buf))
@@ -115,7 +115,7 @@ func TestAppendDayRecordDedup(t *testing.T) {
 	dayFile := filepath.Join(tmpDir, "test.day")
 
 	rec := md1OHLCV{Open: 10, High: 11, Low: 9, Close: 10.5, Amount: 1000, Volume: 100}
-	buf := makeDayRecord(20260318, rec)
+	buf := makeDayRecord(20260318, rec, 100)
 
 	// First write
 	if err := appendDayRecord(dayFile, 20260318, buf); err != nil {
@@ -138,7 +138,7 @@ func TestAppendDayRecordDedup(t *testing.T) {
 	}
 
 	// Older date — should also be skipped
-	oldBuf := makeDayRecord(20260317, rec)
+	oldBuf := makeDayRecord(20260317, rec, 100)
 	if err := appendDayRecord(dayFile, 20260317, oldBuf); err != nil {
 		t.Fatalf("old date append: %v", err)
 	}
@@ -149,7 +149,7 @@ func TestAppendDayRecordDedup(t *testing.T) {
 	}
 
 	// Newer date — should be appended
-	newBuf := makeDayRecord(20260319, rec)
+	newBuf := makeDayRecord(20260319, rec, 100)
 	if err := appendDayRecord(dayFile, 20260319, newBuf); err != nil {
 		t.Fatalf("new date append: %v", err)
 	}
